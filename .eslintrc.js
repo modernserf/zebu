@@ -1,3 +1,7 @@
 module.exports = {
-    "extends": "standard"
+    "extends": "standard",
+    "rules": {
+        "camelcase": ["off"],
+        "comma-dangle": ['error', 'always-multiline']
+    }
 };

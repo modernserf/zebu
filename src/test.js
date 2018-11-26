@@ -10,9 +10,24 @@ import {
   tokenize,
   defaultTokens,
   rootParser,
-  lang
+  lang,
 } from './index'
+import * as parseUtils from './parse-utils'
+
 const tape = require('tape')
+
+const modules = [parseUtils]
+for (const module of modules) {
+  for (const [name, fn] of Object.entries(module)) {
+    if (name.match(/^test_/)) {
+      tape(name.replace(/^test_/, '').replace(/_/g, ' '), (t) => {
+        const res = fn(expecter(t))
+        if (res && res.then) { return res.then(() => { t.end() }) }
+        t.end()
+      })
+    }
+  }
+}
 
 let test = tape
 let expect
@@ -29,9 +44,16 @@ function describe (desc, fn) {
 
 describe.skip = () => {}
 
+function expecter (t) {
+  return (value) => ({
+    toEqual: (compare) => t.deepEquals(value, compare),
+    toThrow: (error) => t.throws(value, error),
+  })
+}
+
 function it (desc, fn) {
   test(desc, (t) => {
-    expect = (value) => ({ toEqual: (compare) => t.deepEquals(value, compare) })
+    expect = expecter(t)
     fn(t)
     t.end()
   })
@@ -48,7 +70,7 @@ describe('tokenizer', () => {
     const tokenize = createTokenizer({
       number: { pattern: /[0-9]+(?:\.[0-9]+)?/, format: Number },
       whitespace: { pattern: /\n|\s/, ignore: true },
-      token: { pattern: /[-+*/()]/ }
+      token: { pattern: /[-+*/()]/ },
     })
     const text = '(-3.1 + 4) * 200'
     const tokens = [...tokenize(text)]
@@ -60,7 +82,7 @@ describe('tokenizer', () => {
       { type: 'number', value: 4 },
       { type: 'token', value: ')' },
       { type: 'token', value: '*' },
-      { type: 'number', value: 200 }
+      { type: 'number', value: 200 },
     ])
   })
 })
@@ -72,11 +94,11 @@ describe('parser', () => {
     const tokens = [
       { type: 'token', value: '(' },
       { type: 'number', value: 3.1 },
-      { type: 'token', value: ')' }
+      { type: 'token', value: ')' },
     ]
     expect(parse(grammar, tokens)).toEqual({
       type: 'number',
-      value: 3.1
+      value: 3.1,
     })
   })
 
@@ -91,17 +113,17 @@ describe('parser', () => {
     const t1 = [
       { type: 'token', value: '(' },
       { type: 'number', value: 3.1 },
-      { type: 'token', value: ')' }
+      { type: 'token', value: ')' },
     ]
     expect(parse(grammar, t1)).toEqual({
       type: 'number',
-      value: 3.1
+      value: 3.1,
     })
 
     const t2 = [{ type: 'token', value: '-' }, { type: 'number', value: 4 }]
     expect(parse(grammar, t2)).toEqual({
       type: 'Neg',
-      value: { type: 'number', value: 4 }
+      value: { type: 'number', value: 4 },
     })
 
     const t3 = [{ type: 'number', value: 5 }]
@@ -125,14 +147,14 @@ describe('parser', () => {
       { type: 'token', value: '(' },
       { type: 'number', value: 123 },
       { type: 'token', value: ')' },
-      { type: 'token', value: ')' }
+      { type: 'token', value: ')' },
     ]
     expect(parse(Expr, tokens)).toEqual({
       type: 'Neg',
       value: {
         type: 'Neg',
-        value: { type: 'number', value: 123 }
-      }
+        value: { type: 'number', value: 123 },
+      },
     })
   })
 
@@ -158,7 +180,7 @@ describe('parser', () => {
           seq(_2, lit('('), p.AddExpr, lit(')')),
           seq(prefix('Neg'), lit('-'), p.Expr),
           token('number')
-        )
+        ),
     })
     const tokens = [
       { type: 'token', value: '(' },
@@ -168,7 +190,7 @@ describe('parser', () => {
       { type: 'number', value: 4 },
       { type: 'token', value: ')' },
       { type: 'token', value: '*' },
-      { type: 'number', value: 200 }
+      { type: 'number', value: 200 },
     ]
     // (-3.1 + 4) * 200
     expect(parse(grammar.AddExpr, tokens)).toEqual({
@@ -177,11 +199,11 @@ describe('parser', () => {
         type: 'Add',
         left: {
           type: 'Neg',
-          value: { type: 'number', value: 3.1 }
+          value: { type: 'number', value: 3.1 },
         },
-        right: { type: 'number', value: 4 }
+        right: { type: 'number', value: 4 },
       },
-      right: { type: 'number', value: 200 }
+      right: { type: 'number', value: 200 },
     })
   })
 })
@@ -208,7 +230,7 @@ describe('root grammar', () => {
       { type: 'identifier', value: 'Expr' },
       { type: 'function', value: neg, interpolated: true },
       { type: 'token', value: '|' },
-      { type: 'identifier', value: 'number' }
+      { type: 'identifier', value: 'number' },
     ])
   })
 
@@ -227,7 +249,7 @@ describe('root grammar', () => {
       { type: 'identifier', value: 'Expr' },
       { type: 'function', value: neg },
       { type: 'token', value: '|' },
-      { type: 'identifier', value: 'number' }
+      { type: 'identifier', value: 'number' },
     ]
     const childGrammar = parse(rootParser.Program, tokens)
     const childTokens = [
@@ -237,14 +259,14 @@ describe('root grammar', () => {
       { type: 'token', value: '(' },
       { type: 'number', value: 123 },
       { type: 'token', value: ')' },
-      { type: 'token', value: ')' }
+      { type: 'token', value: ')' },
     ]
     expect(parse(childGrammar, childTokens)).toEqual({
       type: 'Neg',
       value: {
         type: 'Neg',
-        value: { type: 'number', value: 123 }
-      }
+        value: { type: 'number', value: 123 },
+      },
     })
   })
 })
@@ -305,7 +327,7 @@ describe('createLanguage', () => {
           return { node: tokens[index].value, index: index + 1 }
         }
         return null
-      }
+      },
     }
     const numWithParens = lang`"(" ${num} ")" ${(_, value) => value}`
     expect(numWithParens`( 123 )`).toEqual(123)
@@ -316,7 +338,7 @@ describe('createLanguage', () => {
     expect(num`123`).toEqual(123)
     expect(num.parse({
       tokens: [{ type: 'number', value: 123 }],
-      index: 0
+      index: 0,
     })).toEqual({ node: 123, index: 1 })
   })
 })

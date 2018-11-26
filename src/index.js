@@ -137,7 +137,7 @@ export function createTokenizer (regexMap) {
     ([key, { type = key, format = id, ignore = false }]) => ({
       type,
       format,
-      ignore
+      ignore,
     })
   )
 
@@ -163,7 +163,7 @@ function smartTypeOf (value) {
 const mapInterpolations = value => ({
   type: smartTypeOf(value),
   value,
-  interpolated: true
+  interpolated: true,
 })
 
 function * _tokenize (tokenizer, strs, interpolations) {
@@ -192,12 +192,12 @@ export const defaultTokens = {
   dqstring: {
     pattern: /"(?:\\"|[^"])*"/,
     format: trimQuotes,
-    type: 'string'
+    type: 'string',
   },
   sqstring: {
     pattern: /'(?:\\'|[^'])*'/,
     format: trimQuotes,
-    type: 'string'
+    type: 'string',
   },
   whitespace: { pattern: /\n|\s/, ignore: true },
   comment: { pattern: /#[^\n]+/, ignore: true },
@@ -206,7 +206,7 @@ export const defaultTokens = {
   // match structure tokens individually
   structure: { pattern: /[(){}[\]]/, type: 'token' },
   // match anything else
-  token: { pattern: /[^A-Za-z0-9(){}[\]_\s\n]+/ }
+  token: { pattern: /[^A-Za-z0-9(){}[\]_\s\n]+/ },
 }
 
 // TODO: alternate tokenizers (e.g. lisp)
@@ -219,7 +219,7 @@ const getInitCtx = () => ({ ruleMap: {}, currentRule: null, posInRule: 0 })
 
 const withCtx = (fn) => ({
   withCtx: fn,
-  parse: fn(getInitCtx()).parse
+  parse: fn(getInitCtx()).parse,
 })
 
 export const rootParser = lazyTree({
@@ -310,7 +310,7 @@ export const rootParser = lazyTree({
       seq(
         ({ value }) => _ => matchToken(tok => value.test(tok)),
         hasMethod('test'))
-    )
+    ),
 })
 
 const createLanguage = ({ tokenizer, parser }) => {
@@ -325,7 +325,7 @@ const createLanguage = ({ tokenizer, parser }) => {
 
 const compileGrammar = createLanguage({
   parser: rootParser.Program,
-  tokenizer: defaultTokenizer
+  tokenizer: defaultTokenizer,
 })
 
 export const tokenize = (tokenizer) => (strs, ...interpolations) =>
@@ -334,12 +334,12 @@ export const tokenize = (tokenizer) => (strs, ...interpolations) =>
 export const lang = (strs, ...interpolations) =>
   createLanguage({
     parser: compileGrammar(strs, ...interpolations),
-    tokenizer: defaultTokenizer
+    tokenizer: defaultTokenizer,
   })
 
 lang.withConfig = options => (strs, ...interpolations) =>
   createLanguage({
     parser: compileGrammar(strs, ...interpolations),
     tokenizer: defaultTokenizer,
-    ...options
+    ...options,
   })
