@@ -11,13 +11,14 @@ using a [parsing expression grammar](https://en.m.wikipedia.org/wiki/Parsing_exp
 ```js
 import { lang } from "@modernserf/little-language-lab";
 
+const leftAssociative = (l, rs) => rs.reduce((value, fn) => fn(value), l)
 const math = lang`
-  AddExpr = MulExpr "+" AddExpr ${(l, _, r) => l + r}
-          | MulExpr "-" AddExpr ${(l, _, r) => l - r}
-          | MulExpr
-  MulExpr = Expr "*" MulExpr ${(l, _, r) => l * r}
-          | Expr "/" MulExpr ${(l, _, r) => l / r}
-          | Expr
+  AddExpr = MulExpr AddOp*  ${leftAssociative}
+  AddOp   = "+" MulExpr     ${(_, r) => (l) => l + r}
+          | "-" MulExpr     ${(_, r) => (l) => l - r}
+  MulExpr = Expr MulOp*     ${leftAssociative}
+  MulOp   = "*" Expr        ${(_, r) => (l) => l * r}
+          | "/" Expr        ${(_, r) => (l) => l / r}
   Expr    = "(" AddExpr ")" ${(_, value) => value}
           | "-" Expr        ${(_, value) => -value}
           | number          ${({ value }) => value}

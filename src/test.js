@@ -260,18 +260,21 @@ describe('createLanguage', () => {
     expect(math`-(-(123))`).toEqual(123)
   })
   it('creates a tts that compiles', () => {
+    const leftAssociative = (l, rs) => rs.reduce((value, fn) => fn(value), l)
     const math = lang`
-      AddExpr = MulExpr "+" AddExpr ${(left, _, right) => left + right}
-              | MulExpr "-" AddExpr ${(left, _, right) => left - right}
-              | MulExpr
-      MulExpr = Expr "*" MulExpr ${(left, _, right) => left * right}
-              | Expr "/" MulExpr ${(left, _, right) => left / right}
-              | Expr
+      AddExpr = MulExpr AddOp*  ${leftAssociative}
+      AddOp   = "+" MulExpr     ${(_, r) => (l) => l + r}
+              | "-" MulExpr     ${(_, r) => (l) => l - r}
+      MulExpr = Expr MulOp*     ${leftAssociative}
+      MulOp   = "*" Expr        ${(_, r) => (l) => l * r}
+              | "/" Expr        ${(_, r) => (l) => l / r}
       Expr    = "(" AddExpr ")" ${(_, value) => value}
               | "-" Expr        ${(_, value) => -value}
               | number          ${({ value }) => value}
     `
+
     expect(math`(-3.1 + 4) * 200`).toEqual((-3.1 + 4) * 200)
+    expect(math`1 / 2 / 3`).toEqual(1 / 2 / 3)
   })
 
   it('throws on left recursion', (t) => {
