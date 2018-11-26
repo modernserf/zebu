@@ -1,8 +1,20 @@
 // bootstrap parser
-// TODO: packrat parser?
+// TODO: is this sufficent for packrat?
+const memoParse = (fn) => {
+  const memo = new Map()
+  return ({ tokens, index }) => {
+    const tokenMemo = memo.get(tokens) || {}
+    if (!tokenMemo[index]) {
+      tokenMemo[index] = fn({ tokens, index })
+      memo.set(tokens, tokenMemo)
+    }
+    return tokenMemo[index]
+  }
+}
+
 class Parser {
   constructor (parse) {
-    this.parse = parse
+    this.parse = memoParse(parse)
   }
 }
 
@@ -20,8 +32,7 @@ const matchToken = matcher => p(({ tokens, index }) =>
 export const token = type => matchToken(tok => tok.type === type)
 export const lit = value =>
   matchToken(
-    // TODO: tok.value === value && !tok.literal
-    tok => tok.value === value && ['identifier', 'token'].includes(tok.type)
+    tok => tok.value === value && tok.type !== 'string'
   )
 export const hasMethod = (...methods) =>
   matchToken(tok => tok.value && methods.every(m => m in tok.value))
@@ -176,7 +187,6 @@ export function parse (parser, tokens) {
 
 const trimQuotes = str => str.slice(1, -1)
 export const defaultTokens = {
-  // TODO: "literal" flag on string to better distinguish `"*"` from `*`
   number: { pattern: /-?[0-9]+(?:\.[0-9]+)?/, format: Number },
   dqstring: {
     pattern: /"(?:\\"|[^"])*"/,
