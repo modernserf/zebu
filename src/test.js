@@ -4,6 +4,7 @@ import {
   lit,
   alt,
   seq,
+  lazy,
   lazyTree,
   parse,
   tokenize,
@@ -110,14 +111,12 @@ describe('parser', () => {
   it('parses a recursive grammar', () => {
     const _2 = (_, value) => value
     const prefix = type => (_, value) => ({ type, value })
-    const grammar = lazyTree({
-      Expr: p =>
-        alt(
-          seq(_2, lit('('), p.Expr, lit(')')),
-          seq(prefix('Neg'), lit('-'), p.Expr),
-          token('number')
-        )
-    })
+    const Expr = lazy(() =>
+      alt(
+        seq(_2, lit('('), Expr, lit(')')),
+        seq(prefix('Neg'), lit('-'), Expr),
+        token('number')
+      ))
     // -(-(123))
     const tokens = [
       { type: 'token', value: '-' },
@@ -128,7 +127,7 @@ describe('parser', () => {
       { type: 'token', value: ')' },
       { type: 'token', value: ')' }
     ]
-    expect(parse(grammar.Expr, tokens)).toEqual({
+    expect(parse(Expr, tokens)).toEqual({
       type: 'Neg',
       value: {
         type: 'Neg',

@@ -1,21 +1,31 @@
 // bootstrap parser
 // TODO: packrat parser?
+class Parser {
+  constructor (parse) {
+    this.parse = parse
+  }
+}
+
+const p = (parse) => new Parser(parse)
+
 const next = (tokens, index) => ({ node: tokens[index], index: index + 1 })
 
-const matchToken = matcher => ({ tokens, index }) =>
-  tokens.length > index && matcher(tokens[index]) ? next(tokens, index) : null
+const matchToken = matcher => p(({ tokens, index }) =>
+  tokens.length > index && matcher(tokens[index]) ? next(tokens, index) : null)
 
 export const token = type => matchToken(tok => tok.type === type)
 export const lit = value =>
   matchToken(
     tok => tok.value === value && ['identifier', 'token'].includes(tok.type)
   )
-export const regex = re => matchToken(tok => re.test(tok.value))
+export const hasMethod = (...methods) =>
+  matchToken(tok => tok && methods.every(m => m in tok))
+export const runTest = re => matchToken(tok => re.test(tok.value))
 
-export const seq = (mapFn, ...parsers) => ({ tokens, index }) => {
+export const seq = (mapFn, ...parsers) => p(({ tokens, index }) => {
   const out = []
   for (const p1 of parsers) {
-    const res = p1({ tokens, index })
+    const res = p1.parse({ tokens, index })
     if (!res) {
       return null
     }
@@ -23,22 +33,22 @@ export const seq = (mapFn, ...parsers) => ({ tokens, index }) => {
     index = res.index
   }
   return { node: mapFn(...out), index }
-}
+})
 
-export const alt = (...parsers) => subject => {
+export const alt = (...parsers) => p((subject) => {
   for (const p2 of parsers) {
-    const res = p2(subject)
+    const res = p2.parse(subject)
     if (res) {
       return res
     }
   }
   return null
-}
+})
 
-const any = parser => ({ tokens, index }) => {
+const any = parser => p(({ tokens, index }) => {
   const out = []
   while (index < tokens.length) {
-    const res = parser({ tokens, index })
+    const res = parser.parse({ tokens, index })
     if (!res) {
       break
     }
@@ -46,7 +56,7 @@ const any = parser => ({ tokens, index }) => {
     index = res.index
   }
   return { node: out, index }
-}
+})
 
 const cons = (first, rest) => [first, ...rest]
 const id = x => x
@@ -54,25 +64,25 @@ const _2 = (_1, _2) => _2
 
 const some = parser => seq(cons, parser, any(parser))
 
-const maybe = (parser, defaultNode = null) => subject => {
-  const res = parser(subject)
+const maybe = (parser, defaultNode = null) => p((subject) => {
+  const res = parser.parse(subject)
   if (res) {
     return res
   }
   return { node: defaultNode, index: subject.index }
-}
+})
 
 const sepBy = (valueParser, sepParser) =>
   seq(cons, valueParser, any(seq(_2, sepParser, valueParser)))
 
 export const lazy = fn => {
   let memo = null
-  return (...args) => {
+  return p((...args) => {
     if (!memo) {
       memo = fn()
     }
-    return memo(...args)
-  }
+    return memo.parse(...args)
+  })
 }
 
 export function lazyTree (inMap) {
@@ -127,11 +137,8 @@ export function createTokenizer (regexMap) {
 }
 
 function smartTypeOf (value) {
-  if (typeof value === 'object') {
-    if (!value) {
-      return 'null'
-    }
-    return value.constructor.name
+  if (typeof value === 'object' && !value) {
+    return 'null'
   }
   return typeof value
 }
@@ -152,7 +159,7 @@ function * _tokenize (tokenizer, strs, interpolations) {
 }
 
 export function parse (parser, tokens) {
-  const res = parser({ tokens, index: 0 })
+  const res = parser.parse({ tokens, index: 0 })
   if (!res) {
     throw new Error('No match for parsing')
   }
@@ -206,7 +213,7 @@ export const rootParser = lazyTree({
       const topRuleName = rules[0][0]
       // force evaluation of parser (otherwise parser won't even build until its used!)
       // this also proactively finds parse errors
-      ruleMap[topRuleName]({ tokens: [], index: 0 })
+      ruleMap[topRuleName].parse({ tokens: [], index: 0 })
       return ruleMap[topRuleName]
     }, any(p.Rule)),
   Rule: p =>
@@ -254,9 +261,14 @@ export const rootParser = lazyTree({
       seq(
         ({ value }) => _ => lit(value),
         token('string')),
+      // interpolated parsers
       seq(
-        ({ value }) => _ => regex(value),
-        token('RegExp'))
+        ({ value }) => _ => value,
+        hasMethod('parse')),
+      // interpolated regular expressions
+      seq(
+        ({ value }) => _ => matchToken(tok => value.test(tok)),
+        hasMethod('test'))
     )
 })
 
