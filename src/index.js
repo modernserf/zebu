@@ -16,6 +16,7 @@ const matchToken = matcher => p(({ tokens, index }) =>
 export const token = type => matchToken(tok => tok.type === type)
 export const lit = value =>
   matchToken(
+    // TODO: tok.value === value && !tok.literal
     tok => tok.value === value && ['identifier', 'token'].includes(tok.type)
   )
 export const hasMethod = (...methods) =>
@@ -77,7 +78,7 @@ const sepBy = (valueParser, sepParser) =>
 
 export const lazy = fn => {
   let memo = null
-  return p((...args) => {
+  return new Parser((...args) => {
     if (!memo) {
       memo = fn()
     }
@@ -171,6 +172,7 @@ export function parse (parser, tokens) {
 
 const trimQuotes = str => str.slice(1, -1)
 export const defaultTokens = {
+  // TODO: "literal" flag on string to better distinguish `"*"` from `*`
   number: { pattern: /-?[0-9]+(?:\.[0-9]+)?/, format: Number },
   dqstring: {
     pattern: /"(?:\\"|[^"])*"/,
@@ -186,9 +188,13 @@ export const defaultTokens = {
   comment: { pattern: /#[^\n]+/, ignore: true },
   // match _foo123 as "_foo123"
   identifier: { pattern: /[_A-Za-z][_A-Za-z0-9]*/ },
-  // match anything else as one token per character
-  token: { pattern: /./ }
+  // match structure tokens individually
+  structure: { pattern: /[(){}[\]]/, type: 'token' },
+  // match anything else
+  token: { pattern: /[^A-Za-z0-9(){}[\]_\s\n]+/ }
 }
+
+// TODO: alternate tokenizers (e.g. lisp)
 
 const defaultTokenizer = createTokenizer(defaultTokens)
 
