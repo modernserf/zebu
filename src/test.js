@@ -20,7 +20,7 @@ function describe (desc, fn) {
   test(desc, (t) => {
     const outerTest = test
     test = t.test
-    fn()
+    fn(t)
     test = outerTest
     t.end()
   })
@@ -31,7 +31,7 @@ describe.skip = () => {}
 function it (desc, fn) {
   test(desc, (t) => {
     expect = (value) => ({ toEqual: (compare) => t.deepEquals(value, compare) })
-    fn()
+    fn(t)
     t.end()
   })
 }
@@ -272,5 +272,17 @@ describe('createLanguage', () => {
               | number          ${({ value }) => value}
     `
     expect(math`(-3.1 + 4) * 200`).toEqual((-3.1 + 4) * 200)
+  })
+
+  it('throws on left recursion', (t) => {
+    t.throws(() => {
+      lang`FooExpr = FooExpr "*" ${(x) => x} | number`
+    })
+  })
+
+  it('does not throw on right recursion', (t) => {
+    t.doesNotThrow(() => {
+      lang`Expr = "-" Expr ${(x) => x} | number`
+    })
   })
 })

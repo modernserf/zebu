@@ -1,4 +1,5 @@
 // bootstrap parser
+// TODO: packrat parser?
 const next = (tokens, index) => ({ node: tokens[index], index: index + 1 })
 
 const matchToken = matcher => ({ tokens, index }) =>
@@ -186,7 +187,7 @@ const defaultTokenizer = createTokenizer(defaultTokens)
 
 const recur = fn => expr => ruleMap => fn(expr(ruleMap))
 
-const nilLanguage = nodes => (nodes.length === 0 ? { nodes, index: 0 } : null)
+const nilLanguage = ({ tokens }) => (tokens.length === 0 ? { node: null, index: 0 } : null)
 
 // TODO: helper for processing interpolated values
 // e.g. `${123.45}` is tagged as `{ type: 'number', value: 123.45, interpolated: true }`
@@ -200,9 +201,12 @@ export const rootParser = lazyTree({
       }
       const ruleMap = {}
       for (const [name, rule] of rules) {
-        ruleMap[name] = lazy(() => rule(ruleMap))
+        ruleMap[name] = lazy(() => rule({ ruleMap, currentRule: name, posInRule: 0 }))
       }
       const topRuleName = rules[0][0]
+      // force evaluation of parser (otherwise parser won't even build until its used!)
+      // this also proactively finds parse errors
+      ruleMap[topRuleName]({ tokens: [], index: 0 })
       return ruleMap[topRuleName]
     }, any(p.Rule)),
   Rule: p =>
@@ -211,12 +215,14 @@ export const rootParser = lazyTree({
       token('identifier'), lit('='), p.AltExpr),
   AltExpr: p =>
     seq(
-      alts => ruleMap => alt(...alts.map(x => x(ruleMap))),
+      alts => ctx => alt(...alts.map(x => x(ctx))),
       sepBy(p.SeqExpr, lit('|'))),
   SeqExpr: p =>
     alt(
       seq(
-        (exprs, { value: mapFn }) => ruleMap => seq(mapFn, ...exprs.map(f => f(ruleMap))),
+        (exprs, { value: mapFn }) => ctx =>
+          seq(mapFn, ...exprs.map((f, i) =>
+            f({ ...ctx, posInRule: ctx.posInRule + i }))),
         some(p.OpExpr), token('function')),
       // TODO: allow seq without mapFn
       // seq((first, rest) => ruleMap =>
@@ -233,11 +239,17 @@ export const rootParser = lazyTree({
     ),
   Expr: p =>
     alt(
+      // TODO: `nil`, & Expr, ! Expr (for full PEG compatibility)
       seq(
-        (_, value) => ruleMap => value(ruleMap),
+        (_, value) => ctx => value(ctx),
         lit('('), p.AltExpr, lit(')')),
       seq(
-        ({ value }) => ruleMap => ruleMap[value] || token(value),
+        ({ value }) => ({ ruleMap, currentRule, posInRule }) => {
+          if (value === currentRule && posInRule === 0) {
+            throw new Error(`Invalid left recursion on ${value}`)
+          }
+          return ruleMap[value] || token(value)
+        },
         token('identifier')),
       seq(
         ({ value }) => _ => lit(value),

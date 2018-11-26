@@ -19,8 +19,8 @@ const math = lang`
           | Expr "/" MulExpr ${(l, _, r) => l / r}
           | Expr
   Expr    = "(" AddExpr ")" ${(_, value) => value}
-          | "-" Expr ${(_, value) => -value}
-          | number    ${({ value }) => value}
+          | "-" Expr        ${(_, value) => -value}
+          | number          ${({ value }) => value}
 `
 math`(-3.5 + 4) * 200` // => 100
 ```
