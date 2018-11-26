@@ -20,7 +20,9 @@ class Parser {
 
 const p = (parse) => new Parser(parse)
 
-const eof = p(({ tokens, index }) => index === tokens.length
+export const nil = { parse: ({ index }) => ({ node: null, index }) }
+
+export const eof = p(({ tokens, index }) => index === tokens.length
   ? ({ node: null, index })
   : null)
 
@@ -42,9 +44,7 @@ export const seq = (mapFn, ...parsers) => p(({ tokens, index }) => {
   const out = []
   for (const p1 of parsers) {
     const res = p1.parse({ tokens, index })
-    if (!res) {
-      return null
-    }
+    if (!res) { return null }
     out.push(res.node)
     index = res.index
   }
@@ -54,20 +54,16 @@ export const seq = (mapFn, ...parsers) => p(({ tokens, index }) => {
 export const alt = (...parsers) => p((subject) => {
   for (const p2 of parsers) {
     const res = p2.parse(subject)
-    if (res) {
-      return res
-    }
+    if (res) { return res }
   }
   return null
 })
 
-const any = parser => p(({ tokens, index }) => {
+export const any = parser => p(({ tokens, index }) => {
   const out = []
   while (index < tokens.length) {
     const res = parser.parse({ tokens, index })
-    if (!res) {
-      break
-    }
+    if (!res) { break }
     out.push(res.node)
     index = res.index
   }
@@ -76,11 +72,10 @@ const any = parser => p(({ tokens, index }) => {
 
 const cons = (first, rest) => [first, ...rest]
 const id = x => x
-const _2 = (_1, _2) => _2
 
-const some = parser => seq(cons, parser, any(parser))
+export const some = parser => seq(cons, parser, any(parser))
 
-const maybe = (parser, defaultNode = null) => p((subject) => {
+export const maybe = (parser, defaultNode = null) => p((subject) => {
   const res = parser.parse(subject)
   if (res) {
     return res
@@ -88,15 +83,21 @@ const maybe = (parser, defaultNode = null) => p((subject) => {
   return { node: defaultNode, index: subject.index }
 })
 
-const sepBy = (valueParser, sepParser) =>
-  seq(cons, valueParser, any(seq(_2, sepParser, valueParser)))
+export const sepBy = (valueParser, sepParser) =>
+  seq(cons, valueParser, any(seq((_, value) => value, sepParser, valueParser)))
+
+export const lookahead = (parser) => p((subject) => parser.parse(subject)
+  ? nil.parse(subject)
+  : null)
+
+export const notLookahead = (parser) => p((subject) => parser.parse(subject)
+  ? null
+  : nil.parse(subject))
 
 export const lazy = fn => {
   let memo = null
   return new Parser((...args) => {
-    if (!memo) {
-      memo = fn()
-    }
+    if (!memo) { memo = fn() }
     return memo.parse(...args)
   })
 }
@@ -212,7 +213,7 @@ export const defaultTokens = {
 
 const defaultTokenizer = createTokenizer(defaultTokens)
 
-const recur = fn => expr => ruleMap => fn(expr(ruleMap))
+const recur = fn => expr => ctx => fn(expr(ctx))
 
 const getInitCtx = () => ({ ruleMap: {}, currentRule: null, posInRule: 0 })
 
@@ -277,7 +278,13 @@ export const rootParser = lazyTree({
     ),
   Expr: p =>
     alt(
-      // TODO: `nil`, & Expr, ! Expr (for full PEG compatibility)
+      seq(
+        (_, expr) => ctx => lookahead(expr(ctx)),
+        lit('&'), p.Expr),
+      seq(
+        (_, expr) => ctx => notLookahead(expr(ctx)),
+        lit('!'), p.Expr),
+      seq(() => () => nil, lit('nil')),
       seq(
         (_, value) => ctx => value(ctx),
         lit('('), p.AltExpr, lit(')')),
