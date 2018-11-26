@@ -250,6 +250,16 @@ describe('root grammar', () => {
 })
 
 describe('createLanguage', () => {
+  it('creates nil languages', () => {
+    const nil = lang``
+    expect(nil``).toEqual(null)
+  })
+
+  it('creates languages with a single anonymous rule', () => {
+    const num = lang`"(" number ")" ${(_, { value }) => value}`
+    expect(num`(123)`).toEqual(123)
+  })
+
   it('creates a tiny tts', () => {
     const math = lang`
       Expr = "(" Expr ")" ${(_, value) => value}
@@ -286,5 +296,27 @@ describe('createLanguage', () => {
     t.doesNotThrow(() => {
       lang`Expr = "-" Expr ${(x) => x} | number`
     })
+  })
+
+  it('interpolates parsers', (t) => {
+    const num = {
+      parse: ({ tokens, index }) => {
+        if (tokens[index].type === 'number') {
+          return { node: tokens[index].value, index: index + 1 }
+        }
+        return null
+      }
+    }
+    const numWithParens = lang`"(" ${num} ")" ${(_, value) => value}`
+    expect(numWithParens`( 123 )`).toEqual(123)
+  })
+
+  it('interpolates parser expressions', (t) => {
+    const num = lang`number ${({ value }) => value}`
+    expect(num`123`).toEqual(123)
+    expect(num.parse({
+      tokens: [{ type: 'number', value: 123 }],
+      index: 0
+    })).toEqual({ node: 123, index: 1 })
   })
 })

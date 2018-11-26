@@ -8,6 +8,10 @@ class Parser {
 
 const p = (parse) => new Parser(parse)
 
+const eof = p(({ tokens, index }) => index === tokens.length
+  ? ({ node: null, index })
+  : null)
+
 const next = (tokens, index) => ({ node: tokens[index], index: index + 1 })
 
 const matchToken = matcher => p(({ tokens, index }) =>
@@ -20,7 +24,7 @@ export const lit = value =>
     tok => tok.value === value && ['identifier', 'token'].includes(tok.type)
   )
 export const hasMethod = (...methods) =>
-  matchToken(tok => tok && methods.every(m => m in tok))
+  matchToken(tok => tok.value && methods.every(m => m in tok.value))
 export const runTest = re => matchToken(tok => re.test(tok.value))
 
 export const seq = (mapFn, ...parsers) => p(({ tokens, index }) => {
@@ -200,32 +204,43 @@ const defaultTokenizer = createTokenizer(defaultTokens)
 
 const recur = fn => expr => ruleMap => fn(expr(ruleMap))
 
-const nilLanguage = ({ tokens }) => (tokens.length === 0 ? { node: null, index: 0 } : null)
+const getInitCtx = () => ({ ruleMap: {}, currentRule: null, posInRule: 0 })
 
-// TODO: helper for processing interpolated values
-// e.g. `${123.45}` is tagged as `{ type: 'number', value: 123.45, interpolated: true }`
-// if you can interpolate matchers, then you can match interpolations however you like
-// e.g. `EvenInterpolatedNumber  = ${match(tok => tok.interpolated && tok.type === 'number' && tok.value % 2 === 0}`
+const withCtx = (fn) => ({
+  withCtx: fn,
+  parse: fn(getInitCtx()).parse
+})
+
 export const rootParser = lazyTree({
   Program: p =>
-    seq(rules => {
-      if (!rules.length) {
-        return nilLanguage
-      }
-      const ruleMap = {}
-      for (const [name, rule] of rules) {
-        ruleMap[name] = lazy(() => rule({ ruleMap, currentRule: name, posInRule: 0 }))
-      }
-      const topRuleName = rules[0][0]
-      // force evaluation of parser (otherwise parser won't even build until its used!)
-      // this also proactively finds parse errors
-      ruleMap[topRuleName].parse({ tokens: [], index: 0 })
-      return ruleMap[topRuleName]
-    }, any(p.Rule)),
+    alt(
+      seq(rules => withCtx((ctx) => {
+        // TODO: would this be better without mutation? or is mutation essential?
+        rules.forEach((rule) => rule(ctx))
+        const parser = ctx.ruleMap[ctx.init]
+
+        // force evaluation of parser (otherwise parser won't even build until its used!)
+        // this also proactively finds parse errors
+        parser.parse({ tokens: [], index: 0 })
+        return parser
+      }), some(p.Rule)),
+      seq(withCtx, p.AltExpr),
+      seq(() => eof, eof)
+    ),
   Rule: p =>
-    seq(
-      ({ value: name }, _, rule) => [name, rule],
-      token('identifier'), lit('='), p.AltExpr),
+    alt(
+      seq(
+        ({ value: name }, _, rule) => (ctx) => {
+          ctx.ruleMap[name] = lazy(() => rule(ctx))
+          if (!ctx.init) { ctx.init = name }
+          return name
+        },
+        token('identifier'), lit('='), p.AltExpr)
+      // seq(
+      //   ({ withCtx }) => (ctx) => withCtx(ctx),
+      //   hasMethod('withCtx')
+      // )
+    ),
   AltExpr: p =>
     seq(
       alts => ctx => alt(...alts.map(x => x(ctx))),
@@ -236,7 +251,7 @@ export const rootParser = lazyTree({
         (exprs, { value: mapFn }) => ctx =>
           seq(mapFn, ...exprs.map((f, i) =>
             f({ ...ctx, posInRule: ctx.posInRule + i }))),
-        some(p.OpExpr), token('function')),
+        some(p.OpExpr), matchToken((tok) => tok.type === 'function' && !tok.value.parse)),
       // TODO: allow seq without mapFn
       // seq((first, rest) => ruleMap =>
       //   seq((...xs) => xs, first(ruleMap), ...rest.map(x => x(ruleMap))),
@@ -269,7 +284,10 @@ export const rootParser = lazyTree({
         token('string')),
       // interpolated parsers
       seq(
-        ({ value }) => _ => value,
+        ({ value }) => ctx => value.withCtx(ctx),
+        hasMethod('withCtx')),
+      seq(
+        ({ value }) => ctx => value,
         hasMethod('parse')),
       // interpolated regular expressions
       seq(
@@ -278,13 +296,18 @@ export const rootParser = lazyTree({
     )
 })
 
-const createLanguage = ({ tokenizer, grammar }) => (strs, ...interpolations) => {
-  const tokens = Array.from(_tokenize(tokenizer, strs, interpolations))
-  return parse(grammar, tokens)
+const createLanguage = ({ tokenizer, parser }) => {
+  const tts = (strs, ...interpolations) => {
+    const tokens = Array.from(_tokenize(tokenizer, strs, interpolations))
+    return parse(parser, tokens)
+  }
+  // add `parse`, `withCtx` methods for subparsing
+  Object.assign(tts, parser)
+  return tts
 }
 
 const compileGrammar = createLanguage({
-  grammar: rootParser.Program,
+  parser: rootParser.Program,
   tokenizer: defaultTokenizer
 })
 
@@ -293,13 +316,13 @@ export const tokenize = (tokenizer) => (strs, ...interpolations) =>
 
 export const lang = (strs, ...interpolations) =>
   createLanguage({
-    grammar: compileGrammar(strs, ...interpolations),
+    parser: compileGrammar(strs, ...interpolations),
     tokenizer: defaultTokenizer
   })
 
 lang.withConfig = options => (strs, ...interpolations) =>
   createLanguage({
-    grammar: compileGrammar(strs, ...interpolations),
+    parser: compileGrammar(strs, ...interpolations),
     tokenizer: defaultTokenizer,
     ...options
   })
