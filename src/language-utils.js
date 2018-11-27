@@ -7,10 +7,10 @@ import { tokenize } from './token-utils'
  * @param {import('./parse-utils').Parser} parser
  * @returns TaggedTemplateString
  */
-export const createLanguage = ({ tokenizer, parser, context }) => {
+export const createLanguage = ({ tokenizer, parser }) => {
   const tts = (strs, ...interpolations) => {
     const tokens = Array.from(tokenize(tokenizer, strs, interpolations))
-    return parse(parser, tokens, context)
+    return parse(parser, tokens)
   }
   // add `parse`, `withCtx` methods for subparsing
   //   Object.assign(tts, parser)

@@ -11,15 +11,13 @@
 const memoParse = (parseFn) => {
   const memo = new Map()
   return (subject) => {
-    const { tokens, index, context } = subject
-    const tokenMemo = memo.get(tokens) || new Map()
-    const contextMemo = tokenMemo.get(context) || {}
-    if (!contextMemo[index]) {
-      contextMemo[index] = parseFn(subject)
-      tokenMemo.set(context, contextMemo)
+    const { tokens, index } = subject
+    const tokenMemo = memo.get(tokens) || {}
+    if (!tokenMemo[index]) {
+      tokenMemo[index] = parseFn(subject)
       memo.set(tokens, tokenMemo)
     }
-    return contextMemo[index]
+    return tokenMemo[index]
   }
 }
 
@@ -33,21 +31,19 @@ export class ParseSubject {
   /**
    * @param {Token[]} tokens
    * @param {number} index
-   * @param {any} context
    */
-  constructor (tokens, index, context) {
+  constructor (tokens, index) {
     this.tokens = tokens
     this.index = index
-    this.context = context
   }
   update (output) {
-    return new ParseSubject(this.tokens, output.index, output.context)
+    return new ParseSubject(this.tokens, output.index)
   }
-  output (node, index = this.index, context = this.context) {
-    return new ParserOutput(node, index, context)
+  output (node, index = this.index) {
+    return new ParserOutput(node, index)
   }
-  error (error, index = this.index, context = this.context) {
-    return new ParserError(error, index, context)
+  error (error, index = this.index) {
+    return new ParserError(error, index)
   }
   atIndex () {
     return this.tokens[this.index]
@@ -128,22 +124,19 @@ export class ParserOutput {
   /**
    * @param {any} node
    * @param {number} index
-   * @param {any} context
    */
-  constructor (node, index, context) {
+  constructor (node, index) {
     this.ok = true
     this.node = node
     this.index = index
-    this.context = context
   }
 }
 
 export class ParserError {
-  constructor (error, index, context) {
+  constructor (error, index) {
     this.ok = false
     this.error = error
     this.index = index
-    this.context = context
   }
 }
 
@@ -365,19 +358,12 @@ export const peek = (parser) => new Parser((subject) =>
     : subject.error(['expected', parser]))
 
 /**
- * get the current parser context without consuming input.
- */
-export const readContext = new Parser((subject) =>
-  subject.output(subject.context))
-
-/**
  * Parse a stream of tokens, and return the output.
  * @param {Parser} parser
  * @param {Token[]} tokens
- * @param {*} context
  */
-export function parse (parser, tokens, context) {
-  const subject = new ParseSubject(tokens, 0, context)
+export function parse (parser, tokens) {
+  const subject = new ParseSubject(tokens, 0)
   const res = parser.parse(subject)
   if (!res.ok) {
     throw new Error(res.error)

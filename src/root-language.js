@@ -169,7 +169,6 @@ export const lang = (strs, ...interpolations) =>
   createLanguage({
     parser: compileGrammar(strs, ...interpolations),
     tokenizer: defaultTokenizer,
-    context: { ruleMap: {} },
   })
 
 lang.withConfig = options => (strs, ...interpolations) =>
