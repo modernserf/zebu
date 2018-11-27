@@ -2,7 +2,7 @@ import {
   Parser, seq, repeat, alt, end, token, lit, sepBy,
   matchToken, not, peek, nil, testValue, hasProps, maybe, ParseSubject,
 } from './parse-utils'
-import { createTokenizer, tokenize, jsNumber, string, whitespace, lineComment, jsIdentifier, groupings, TokenPattern } from './token-utils'
+import { createTokenizer, tokenize, jsNumber, string, whitespace, lineComment, jsIdentifier, groupings, TokenPattern, $t } from './token-utils'
 import { createLanguage } from './language-utils'
 
 class Quote {
@@ -113,7 +113,6 @@ export const defaultTokenizer = createTokenizer({
 
 const $toks = (strs, ...interpolations) =>
   tokenize(defaultTokenizer, strs, interpolations)
-const $t = (type, value = null, meta = {}) => ({ type, value, meta })
 
 export function test_defaultTokenizer (expect) {
   const neg = (_, value) => -value

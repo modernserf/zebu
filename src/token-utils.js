@@ -6,7 +6,7 @@ class Token {
   }
 }
 
-const $t = (type, value, meta) => new Token(type, value, meta)
+export const $t = (type, value, meta) => new Token(type, value, meta)
 
 const mergeRegexes = (regexes, flags) => new RegExp(
   regexes.map(re => '(' + re.toString().slice(1, -1) + ')').join('|'),

@@ -8,7 +8,7 @@
   "main": "index.build.js",
   "scripts": {
     "lint": "eslint .",
-    "test": "npm run build:test && tape src/test.build.js | faucet",
+    "test": "npm run build:test && node src/test.build.js | faucet",
     "test:debug": "npm run build:test && node src/test.build.js",
     "build:cjs": "rollup src/index.js -o index.build.js -f cjs",
     "build:test": "rollup src/test.js -o src/test.build.js -f cjs",
@@ -22,7 +22,6 @@
     "eslint-plugin-promise": "^4.0.1",
     "eslint-plugin-standard": "^4.0.0",
     "faucet": "0.0.1",
-    "rollup": "^0.67.3",
-    "tape": "^4.9.1"
+    "rollup": "^0.67.3"
   }
 }
