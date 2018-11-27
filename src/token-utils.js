@@ -31,35 +31,53 @@ function capturedIndex (match) {
   throw new Error('Matched with no capture')
 }
 
+const id = (x) => x
+export class TokenPattern {
+  constructor (pattern, { format = id, type, meta = {}, ignore = false } = {}) {
+    this.pattern = pattern
+    this.format = format
+    this.type = type
+    this.meta = meta
+    this.ignore = ignore
+  }
+  asType (type) {
+    const next = new TokenPattern(this.pattern, this)
+    next.type = type
+    return next
+  }
+  ignored () {
+    const next = new TokenPattern(this.pattern, this)
+    next.ignore = true
+    return next
+  }
+  * tokens (value) {
+    if (this.ignore) { return }
+    yield new Token(this.type, this.format(value), this.meta)
+  }
+}
+
 /**
- * @typedef {{
- *   type: string,
- *   format: (s: string) => any,
- *   ignore: boolean,
- *   meta: {}
- * }} TokenRule
  * @typedef {(text: string) => IterableIterator<Token>} Tokenizer
- * @param {{[x: string]: TokenRule}} regexMap
+ * @param {{[x: string]: TokenPattern}} patternMap
  * @returns {Tokenizer}
  */
-export function createTokenizer (regexMap) {
-  const byIndex = Object.entries(regexMap).map(
-    ([key, { type = key, format = (x) => x, ignore = false, meta = {} }]) => ({
-      type,
-      format,
-      ignore,
-      meta,
+export function createTokenizer (patternMap) {
+  const byIndex = Object.entries(patternMap).map(
+    ([key, pattern]) => {
+      if (pattern instanceof RegExp) {
+        pattern = new TokenPattern(pattern)
+      } else if (!pattern.asType) {
+        pattern = new TokenPattern(pattern.pattern, pattern)
+      }
+      return pattern.type ? pattern : pattern.asType(key)
     })
-  )
 
-  const regexBase = mergeRegexes(Object.values(regexMap).map(x => x.pattern))
+  const regexBase = mergeRegexes(Object.values(patternMap).map(x => x.pattern))
   return function * (text) {
     for (const match of runSticky(regexBase, text)) {
       const { index, captured } = capturedIndex(match)
-      const { type, format, ignore, meta } = byIndex[index]
-      if (!ignore) {
-        yield new Token(type, format(captured), meta)
-      }
+      const pattern = byIndex[index]
+      yield * pattern.tokens(captured)
     }
   }
 }
@@ -113,3 +131,31 @@ export function * tokenize (tokenizer, strs, interpolations) {
     }
   }
 }
+
+const trimQuotes = str => str.slice(1, -1)
+
+export const jsNumber = new TokenPattern(
+  /-?[0-9]+(?:\.[0-9]+)?/,
+  { format: Number, meta: { literal: true } }
+)
+
+export const string = (q) => new TokenPattern(
+  new RegExp(String.raw`${q}(?:\\${q}|[^${q}])*${q}`),
+  { format: trimQuotes, meta: { literal: true } }
+)
+
+export const whitespace = new TokenPattern(/(?:\n|\s)+/)
+
+export const lineComment = (delimiter) =>
+  new TokenPattern(new RegExp(String.raw`${delimiter}[^\n]+`))
+
+export const jsIdentifier = new TokenPattern(/[_$A-Za-z][_$A-Za-z0-9]*/)
+
+export const groupings = new TokenPattern(/[(){}[\]]/)
+
+const escapeRegex = (str) =>
+  str.replace(/[.$*+?()!{^[\\\]]/g, (ch) => '\\' + ch)
+
+export const keywords = (...kws) => new TokenPattern(
+  new RegExp(kws.map(escapeRegex).join('|'))
+)

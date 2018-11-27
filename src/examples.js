@@ -1,4 +1,5 @@
 import { lang } from './index'
+import { createTokenizer, whitespace, lineComment, jsNumber, string, keywords, TokenPattern } from './token-utils'
 
 const _2 = (_, x) => x
 const value = ({ value }) => value
@@ -18,28 +19,32 @@ export const json = lang`
 
 const _eval = (ctx, { type, value }) => ({
   value: () => value,
-  expr: () => _apply(ctx, value.map((t) => _eval(ctx, t))),
+  expr: () => _eval(ctx, value[0])(ctx, value.slice(1)),
   identifier: () => ctx[value],
 })[type]()
-
-// note: "functions" return { ctx, value }
-const _apply = (ctx, [fn, ...args]) => fn(ctx, ...args)
-
-const asValue = ({ value }) => ({ type: 'value', value })
-
-let baseCtx
 
 const lispInterpreter = (exprs) => (initCtx = baseCtx) =>
   exprs.reduce(({ ctx }, expr) => _eval(ctx, expr), initCtx)
 
-export const lisp = lang.withConfig({ tokenizer: lispTokenizer })`
+const lispTokenizer = createTokenizer({
+  number: jsNumber,
+  string: string(`"`),
+  whitespace: whitespace.ignored(),
+  comment: lineComment(';').ignored(),
+  token: keywords(`'`, `(`, `)`),
+  identifier: new TokenPattern(/[^\s\n"';()]+/),
+})
+
+const asValue = ({ value }) => ({ type: 'value', value })
+
+export const sicp = lang.withConfig({ tokenizer: lispTokenizer })`
     Prog = Expr * ${lispInterpreter}
     Expr = "'" Expr ${(_, value) => asValue(value)}
          | "(" Expr* ")" ${(_, value) => ({ type: 'expr', value })}
          | string   ${asValue}
          | number   ${asValue}
-         | function ${asValue} # interpolate JS fns as macros
-         | identifier
+         | function ${asValue} # interpolate JS fns as macros,
+         | identifier          # returning { ctx, value }
 `
 
 const fn = (f) => (ctx, ...args) => ({ ctx, value: f(...args) })
@@ -48,7 +53,7 @@ const def = (ctx, name, value) => {
   return { ctx }
 }
 
-baseCtx = lisp`
+const baseCtx = sicp`
     (${(ctx) => def(ctx, 'def', def)}) ; def "def"
     (def car ${fn(([x]) => x)})
     (def cdr ${fn(([_, ...xs]) => xs)})

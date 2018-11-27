@@ -2,7 +2,7 @@ import {
   Parser, seq, repeat, alt, end, token, lit, sepBy,
   matchToken, not, peek, nil, testValue, hasProps, maybe, ParseSubject,
 } from './parse-utils'
-import { createTokenizer, tokenize } from './token-utils'
+import { createTokenizer, tokenize, jsNumber, string, whitespace, lineComment, jsIdentifier, groupings, TokenPattern } from './token-utils'
 import { createLanguage } from './language-utils'
 
 class Quote {
@@ -100,37 +100,16 @@ const rootParser = Parser.language({
   ),
 })
 
-const trimQuotes = str => str.slice(1, -1)
-const defaultTokens = {
-  number: {
-    pattern: /-?[0-9]+(?:\.[0-9]+)?/,
-    format: Number,
-    meta: { literal: true },
-  },
-  dqstring: {
-    pattern: /"(?:\\"|[^"])*"/,
-    format: trimQuotes,
-    type: 'string',
-    meta: { literal: true },
-  },
-  sqstring: {
-    pattern: /'(?:\\'|[^'])*'/,
-    format: trimQuotes,
-    type: 'string',
-    meta: { literal: true },
-  },
-  whitespace: { pattern: /\n|\s/, ignore: true },
-  comment: { pattern: /#[^\n]+/, ignore: true },
-  // match _foo123 as "_foo123"
-  identifier: { pattern: /[_A-Za-z][_A-Za-z0-9]*/ },
-  // match structure tokens individually
-  structure: { pattern: /[(){}[\]]/, type: 'token' },
-  // match anything else
-  token: { pattern: /[^A-Za-z0-9(){}[\]_\s\n]+/ },
-}
-
-// TODO: alternate tokenizers (e.g. lisp)
-export const defaultTokenizer = createTokenizer(defaultTokens)
+export const defaultTokenizer = createTokenizer({
+  number: jsNumber,
+  dqstring: string(`"`).asType('string'),
+  sqstring: string(`'`).asType('string'),
+  whitespace: whitespace.ignored(),
+  comment: lineComment('#').ignored(),
+  identifier: jsIdentifier,
+  groupings: groupings.asType('token'),
+  token: new TokenPattern(/[^A-Za-z0-9(){}[\]_\s\n]+/),
+})
 
 const $toks = (strs, ...interpolations) =>
   tokenize(defaultTokenizer, strs, interpolations)
