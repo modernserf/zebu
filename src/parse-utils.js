@@ -60,9 +60,10 @@ export class Parser {
    * @param {() => parseFn} parserThunk
    */
   static lazy (parserThunk) {
+    let memo
     return new Parser((subject) => {
-      this.parser = parserThunk()
-      return this.parser(subject)
+      if (!memo) { memo = parserThunk() }
+      return memo.parse(subject)
     })
   }
 
@@ -82,6 +83,7 @@ export class Parser {
     let outMap = {}
     for (const key in inMap) {
       outMap[key] = Parser.lazy(() => inMap[key](outMap))
+      outMap[key]._name = key
     }
     return outMap
   }
@@ -91,6 +93,26 @@ export class Parser {
   constructor (parseFn) {
     this.parse = parseFn
   }
+}
+
+export function test_Parser_lazy (expect) {
+  const Expr = Parser.lazy(() =>
+    alt(
+      seq((_, x) => x, lit('('), Expr, lit(')')),
+      seq((_, x) => -x, lit('-'), Expr),
+      seq(({ value }) => value, token('number'))
+    ))
+  // -(-(123))
+  const tokens = [
+    $t('token', '-'),
+    $t('token', '('),
+    $t('token', '-'),
+    $t('token', '('),
+    $t('number', 123),
+    $t('token', ')'),
+    $t('token', ')'),
+  ]
+  expect(parse(Expr, tokens)).toEqual(123)
 }
 
 export class MemoParser extends Parser {
@@ -194,7 +216,7 @@ export function test_lit_matches_values (expect) {
  * @param  {...string} methods
  */
 export const hasProps = (...methods) =>
-  matchToken((tok) => tok.value && methods.every((m) => m in tok.value))
+  matchToken((tok) => tok.value && methods.every((m) => tok.value[m]))
 
 /**
  * Object with a test method (e.g. a regular expression).
@@ -217,6 +239,7 @@ export const testValue = (tester) =>
 export const seq = (mapFn, ...parsers) => new MemoParser((subject) => {
   const out = []
   for (const p of parsers) {
+    if (!p.parse) { console.warn('parser:', p, subject) }
     const res = p.parse(subject)
     if (!res.ok) { return res }
     out.push(res.node)
@@ -241,11 +264,13 @@ export function test_seq_matches_a_sequence (expect) {
  * @param  {...Parser} parsers
  */
 export const alt = (...parsers) => new MemoParser((subject) => {
+  let errors = []
   for (const p of parsers) {
     const res = p.parse(subject)
     if (res.ok) { return res }
+    errors.push(res.error)
   }
-  return subject.error(['did not match alt', parsers])
+  return subject.error(['alts failed:', errors])
 })
 
 export function test_alt_matches_one_of_options (expect) {
@@ -265,16 +290,29 @@ export function test_alt_matches_one_of_options (expect) {
 export const repeat = (parser, min = 0, max = Infinity) => new MemoParser((subject) => {
   const out = []
   while (subject.index < subject.tokens.length && out.length < max) {
-    const res = parser.parser(subject)
+    const res = parser.parse(subject)
     if (!res.ok) { break }
     out.push(res.node)
-    subject = subject.update(out)
+    subject = subject.update(res)
   }
   if (out.length < min) {
     return subject.error(['not enough items', parser, min])
   }
   return subject.output(out)
 })
+
+export function test_repeat (expect) {
+  const tokens = [
+    $t('identifier', 'x'),
+    $t('identifier', 'y'),
+    $t('identifier', 'z'),
+    $t('foo'),
+  ]
+  const parser = seq(x => x, repeat(seq(({ value }) => value, token('identifier'))), token('foo'))
+  expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
+}
+
+export const maybe = (parser) => seq(([x]) => x, repeat(parser, 0, 1))
 
 /**
  * match a sequence of valueParser, separated by separatorParser,
@@ -287,11 +325,26 @@ export const repeat = (parser, min = 0, max = Infinity) => new MemoParser((subje
  */
 export const sepBy = (valueParser, separatorParser, min, max) =>
   seq(
-    (head, ...tail) => [head, ...tail],
+    (head, tail) => [head, ...tail],
     valueParser, repeat(seq(
       (_, value) => value,
       separatorParser, valueParser
     ), min, max))
+
+export function test_sepBy (expect) {
+  const tokens = [
+    $t('identifier', 'x'),
+    $t('bar'),
+    $t('identifier', 'y'),
+    $t('bar'),
+    $t('identifier', 'z'),
+  ]
+  const parser = sepBy(
+    seq(({ value }) => value, token('identifier')),
+    token('bar')
+  )
+  expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
+}
 
 /**
  * match if the parser fails; fail if it matches. Consumes no input.
