@@ -345,6 +345,51 @@ export function test_sepBy (expect) {
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
 
+export const leftOp = (valueParser, opParser) =>
+  seq(
+    (l, rs) => rs.reduce((left, { op, right }) => op(left, right), l),
+    valueParser,
+    repeat(seq((op, right) => ({ op, right }), opParser, valueParser))
+  )
+
+export function test_leftOp (expect) {
+  const tokens = [
+    $t('number', 1),
+    $t('identifier', '/'),
+    $t('number', 2),
+    $t('identifier', '/'),
+    $t('number', 3),
+  ]
+  const parser = leftOp(
+    seq(({ value }) => value, token('number')),
+    seq(() => (left, right) => left / right, lit('/'))
+  )
+  expect(parse(parser, tokens)).toEqual(1 / 2 / 3)
+}
+
+export const rightOp = (valueParser, opParser) => Parser.lazy(() => alt(
+  seq(
+    (l, op, r) => op(l, r),
+    valueParser, opParser, rightOp(valueParser, opParser)
+  ),
+  valueParser
+))
+
+export function test_rightOp (expect) {
+  const tokens = [
+    $t('number', 1),
+    $t('identifier', '/'),
+    $t('number', 2),
+    $t('identifier', '/'),
+    $t('number', 3),
+  ]
+  const parser = rightOp(
+    seq(({ value }) => value, token('number')),
+    seq(() => (left, right) => left / right, lit('/'))
+  )
+  expect(parse(parser, tokens)).toEqual(1 / (2 / 3))
+}
+
 /**
  * match if the parser fails; fail if it matches. Consumes no input.
  * @param {Parser} parser

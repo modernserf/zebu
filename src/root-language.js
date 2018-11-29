@@ -1,6 +1,6 @@
 import {
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  matchToken, not, peek, nil, testValue, hasProps, maybe, ParseSubject,
+  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp,
 } from './parse-utils'
 import { createTokenizer, tokenize, jsNumber, string, whitespace, lineComment, jsIdentifier, groupings, TokenPattern, $t } from './token-utils'
 import { createLanguage } from './language-utils'
@@ -20,9 +20,6 @@ class Quote {
 
 const q = (...values) => new Quote(values)
 q.withContext = (...values) => new Quote(values, true)
-
-const plainFunction = matchToken((tok) =>
-  tok.type === 'function' && !tok.value.parse)
 
 const lookup = (ctx, value) => {
   const rule = ctx.ruleMap[value]
@@ -67,29 +64,34 @@ const rootParser = Parser.language({
     // `FooExpr BarExpr ${mapFn}`
     seq(
       (exprs, { value: mapFn }) => q(seq, mapFn, ...exprs),
-      repeat(p.OpExpr, 1), plainFunction
+      repeat(p.OpExpr, 1), p.PlainFn
     ),
-    // `FooExpr BarExpr` => [foo, bar]
-    // seq(
-    //   (exprs) => seq((x) => x, exprs),
-    //   repeat(p.OpExpr, 2),
-    // ),
     p.OpExpr
   ),
   OpExpr: (p) => alt(
+    leftOp(
+      p.RepExpr,
+      alt(
+        seq(() => (l, r) => q(leftOp, l, r), lit('<%')),
+        seq(() => (l, r) => q(leftOp, l, r), lit('%>')),
+        seq(() => (l, r) => q(sepBy, l, r), lit('%')),
+      )
+    )
+  ),
+  RepExpr: (p) => alt(
     // FooExpr *
     seq((parser) => q(repeat, parser, 0), p.Expr, lit('*')),
     // BarExpr +
-    seq((parser) => q(repeat, parser, 1), p.Expr, lit('*')),
+    seq((parser) => q(repeat, parser, 1), p.Expr, lit('+')),
     // QuuxExpr ?
-    seq((parser) => q(maybe, parser), p.Expr, lit('*')),
+    seq((parser) => q(maybe, parser), p.Expr, lit('?')),
     p.Expr
   ),
   Expr: (p) => alt(
     // !FooExpr
     seq((_, expr) => q(not, expr), lit('!'), p.Expr),
     // &BarExpr
-    seq((_, expr) => q(peek, expr), lit('!'), p.Expr),
+    seq((_, expr) => q(peek, expr), lit('&'), p.Expr),
     // nil
     seq(() => q(nil), lit('nil')),
     // ( FooExpr )
@@ -104,6 +106,10 @@ const rootParser = Parser.language({
     seq(({ value }) => value.ast, hasProps('ast')),
     // inlined parsers
     seq(({ value }) => q(() => value), hasProps('parse'))
+  ),
+  PlainFn: (p) => seq(
+    (_, value) => value,
+    not(hasProps('parse')), token('function')
   ),
 })
 
@@ -186,14 +192,13 @@ export function test_lang_single_recursive_rule (expect) {
 }
 
 export function test_lang_multiple_rules (expect) {
-  const leftAssociative = (l, rs) => rs.reduce((value, fn) => fn(value), l)
   const math = lang`
-    AddExpr = MulExpr AddOp*  ${leftAssociative}
-    AddOp   = "+" MulExpr     ${(_, r) => (l) => l + r}
-            | "-" MulExpr     ${(_, r) => (l) => l - r}
-    MulExpr = Expr MulOp*     ${leftAssociative}
-    MulOp   = "*" Expr        ${(_, r) => (l) => l * r}
-            | "/" Expr        ${(_, r) => (l) => l / r}
+    AddExpr = MulExpr <% AddOp
+    AddOp   = "+" ${() => (l, r) => l + r}
+            | "-" ${() => (l, r) => l - r}
+    MulExpr = Expr <% MulOp
+    MulOp   = "*" ${() => (l, r) => l * r}
+            | "/" ${() => (l, r) => l / r}
     Expr    = "(" AddExpr ")" ${(_, value) => value}
             | "-" Expr        ${(_, value) => -value}
             | number          ${({ value }) => value}

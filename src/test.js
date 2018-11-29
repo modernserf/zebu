@@ -24,15 +24,16 @@ async function runTests (modules) {
         console.log('#', message)
         try {
           await test(expect)
+          console.log('ok', count)
+          passCount++
         } catch (e) {
+          console.log('not ok', count, e.message)
           if (e instanceof assert.AssertionError) {
-            console.log('not ok', count, e.message)
             break
+          } else {
+            throw e
           }
-          throw e
         }
-        console.log('ok', count)
-        passCount++
       }
     }
   }
