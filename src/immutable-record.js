@@ -1,20 +1,3 @@
-class Record {
-  constructor (entries) {
-    const values = []
-    for (const [key, value] of entries) {
-      this[key] = value
-      values.push(value)
-    }
-    Record.Values.set(this, values)
-    Object.freeze(this)
-  }
-  * [Symbol.iterator] () {
-    yield * Record.Values.get(this)
-  }
-}
-
-Record.Values = new WeakMap()
-
 /**
  * works like a WeakMap, but can also hold primitives.
  */
@@ -50,13 +33,19 @@ class PolyMap {
   constructor () {
     this._rootMap = new FlimsyMap()
   }
-  get (keys) {
+  _find (keys) {
     let map = this._rootMap
     for (const key of keys) {
       map = map.get(key)
-      if (!map) { return null }
+      if (!map) { return { ok: false, value: null } }
     }
-    return map.get(PolyMap.END)
+    return { ok: true, value: map.get(PolyMap.END) }
+  }
+  get (keys) {
+    return this._find(keys).value
+  }
+  has (keys) {
+    return this._find(keys).ok
   }
   set (keys, value) {
     let map = this._rootMap
@@ -120,31 +109,31 @@ export function test_sorter (expect) {
 class RecordState {
   constructor () {
     // state
-    this.map = new PolyMap()
-    this.sorter = new Sorter()
-    // convenience accessors
-    this.record = (fields = {}) =>
-      this.getRecord(this.sorter.sortEntries(entriesWithSymbols(fields)))
-    this.tuple = (...values) =>
-      this.getRecord(Object.entries(values))
+    this._map = new PolyMap()
+    this._sorter = new Sorter()
+    // accessors
+    this.record = this.record.bind(this)
+    this.tuple = this.tuple.bind(this)
   }
-  getRecord (entries) {
-    const flatEntries = entries.reduce((list, pair) => list.concat(pair), [])
-    const foundRecord = this.map.get(flatEntries)
+  record (fields = {}) {
+    const sortedEntries = this._sorter.sortEntries(entriesWithSymbols(fields))
+    const flatEntries = flatten(sortedEntries)
+    const foundRecord = this._map.get(flatEntries)
     if (foundRecord) { return foundRecord }
-    const newRecord = new Record(entries)
-    this.map.set(flatEntries, newRecord)
+
+    const newRecord = Object.freeze({ ...fields })
+    this._map.set(flatEntries, newRecord)
     return newRecord
   }
-}
+  tuple (...values) {
+    const flatEntries = flatten(Object.entries(values))
+    const foundTuple = this._map.get(flatEntries)
+    if (foundTuple) { return foundTuple }
 
-export function test_getRecord (expect) {
-  const recordState = new RecordState()
-  const left = recordState.getRecord([['x', 1], ['y', 2]])
-  const right = recordState.getRecord([['x', 1], ['y', 2]])
-  expect(left === right).toEqual(true)
-  expect(left.x).toEqual(1)
-  expect(left.y).toEqual(2)
+    const newTuple = Object.freeze([...values])
+    this._map.set(flatEntries, newTuple)
+    return newTuple
+  }
 }
 
 const globalState = new RecordState()
@@ -214,4 +203,8 @@ function entriesWithSymbols (object) {
   const allKeys = Object.keys(object)
     .concat(Object.getOwnPropertySymbols(object))
   return allKeys.map((key) => [key, object[key]])
+}
+
+function flatten (arr) {
+  return arr.reduce((list, value) => list.concat(value), [])
 }
