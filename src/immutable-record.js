@@ -14,10 +14,9 @@ class Record {
 }
 
 Record.Values = new WeakMap()
-Record.empty = new Record([])
 
 /**
- * Not quite a weak map.
+ * works like a WeakMap, but can also hold primitives.
  */
 class FlimsyMap {
   constructor () {
@@ -35,78 +34,122 @@ class FlimsyMap {
     this._lookup(key).set(key, value)
     return this
   }
-  getDeep (...keys) {
-    let value = this
-    for (const key of keys) {
-      if (!value) { return null }
-      value = value.get(key)
-    }
-    return value
-  }
-  updateDeep (update, key, ...restKeys) {
-    if (!restKeys.length) {
-      this.set(key, update(this.get(key)))
-    } else {
-      const childMap = this.get(key) || new FlimsyMap()
-      this.set(key, childMap.updateDeep(update, ...restKeys))
-    }
-    return this
+  has (key) {
+    return this._lookup(key).has(key)
   }
 }
 
 /**
- * size -> key -> value -> records
- * @type {FlimsyMap<number, FlimsyMap<string, FlimsyMap<any, record[]>>> }
+ * a FlimsyMap that simulates tuple keys.
+ * It implements this by creating a tree of FlimsyMaps for each key,
+ * with the final value using the unique key `PolyMap.END`.
+ * @todo investigate if this performs better with a leading "length"
+ * key, instead of a trailing "end" key.
  */
-const recordsByCount = new FlimsyMap()
-
-function lookupRecordByFields (fields, byCount) {
-  const count = fields.length
-  if (count === 0) { return Record.empty }
-  const [firstField, ...restFields] = fields
-  const [key, value] = firstField
-
-  let candidateRecords = byCount.getDeep(count, key, value)
-  if (!candidateRecords) { return null }
-
-  // check that remaining fields match
-  for (const [key, value] of restFields) {
-    const nextCandidates = byCount.getDeep(count, key, value)
-    if (!nextCandidates) { return null }
-    candidateRecords = intersection(candidateRecords, nextCandidates)
-    if (!candidateRecords.length) { return null }
+class PolyMap {
+  constructor () {
+    this._rootMap = new FlimsyMap()
   }
-
-  if (candidateRecords.length > 1) {
-    throw new Error('has duplicate records')
+  get (keys) {
+    let map = this._rootMap
+    for (const key of keys) {
+      map = map.get(key)
+      if (!map) { return null }
+    }
+    return map.get(PolyMap.END)
   }
-
-  return candidateRecords[0]
-}
-
-function createRecord (fields, byCount) {
-  const out = new Record(fields)
-  const count = fields.length
-  for (const [key, value] of fields) {
-    byCount.updateDeep(
-      (records = []) => { records.push(out); return records },
-      count, key, value
-    )
+  set (keys, value) {
+    let map = this._rootMap
+    for (const key of keys) {
+      if (!map.has(key)) {
+        map.set(key, new FlimsyMap())
+      }
+      map = map.get(key)
+    }
+    map.set(PolyMap.END, value)
+    return this
   }
-  return out
+}
+PolyMap.END = Symbol('END')
+
+export function test_polymap_lookup (expect) {
+  const map = new PolyMap()
+  map.set(['foo', 'bar', 'baz'], 123)
+  expect(map.get(['foo', 'bar', 'baz'])).toEqual(123)
 }
 
-function intersection (left, right) {
-  return left.filter((item) => right.includes(item))
+/**
+ * the PolyMap that keeps track of every record requires the keys of each record
+ * to be in a consistent order. However, some JS values (e.g. symbols, objects)
+ * are not sortable. To get around this, a Sorter object assigns unique ids
+ * to every object it tracks, so that they can be consistently
+ * (though arbitrarily) sorted.
+ */
+class Sorter {
+  constructor () {
+    this.sortID = 0
+    this.sortMap = new FlimsyMap()
+  }
+  getSortID (value) {
+    if (!this.sortMap.has(value)) {
+      this.sortMap.set(value, this.sortID++)
+    }
+    return this.sortMap.get(value)
+  }
+  sortEntries (entries) {
+    return entries.sort(([a], [b]) => this.getSortID(a) - this.getSortID(b))
+  }
 }
 
-export function record (fields = {}, byCount = recordsByCount) {
-  const entries = Object.entries(fields)
-  return lookupRecordByFields(entries, byCount) ||
-    createRecord(entries, byCount)
+export function test_sorter (expect) {
+  const sorter = new Sorter()
+  const left = sorter.sortEntries(
+    Object.entries({ x: 1, y: 2, sym1: 3, sym2: 4 })
+  )
+  const right = sorter.sortEntries(
+    Object.entries({ sym2: 4, y: 2, x: 1, sym1: 3 })
+  )
+  expect(left).toEqual(right)
+  expect(left.length).toEqual(4)
 }
 
-export const tuple = (...values) => record(values)
+/**
+ * for records to be comparable, they need to be stored in the same lookup
+ * table and use the same system for sorting keys.
+ */
+class RecordState {
+  constructor () {
+    // state
+    this.map = new PolyMap()
+    this.sorter = new Sorter()
+    // convenience accessors
+    this.record = (fields = {}) =>
+      this.getRecord(this.sorter.sortEntries(entriesWithSymbols(fields)))
+    this.tuple = (...values) =>
+      this.getRecord(Object.entries(values))
+  }
+  getRecord (entries) {
+    const flatEntries = entries.reduce((list, pair) => list.concat(pair), [])
+    const foundRecord = this.map.get(flatEntries)
+    if (foundRecord) { return foundRecord }
+    const newRecord = new Record(entries)
+    this.map.set(flatEntries, newRecord)
+    return newRecord
+  }
+}
+
+export function test_getRecord (expect) {
+  const recordState = new RecordState()
+  const left = recordState.getRecord([['x', 1], ['y', 2]])
+  const right = recordState.getRecord([['x', 1], ['y', 2]])
+  expect(left === right).toEqual(true)
+  expect(left.x).toEqual(1)
+  expect(left.y).toEqual(2)
+}
+
+const globalState = new RecordState()
+
+export const { record, tuple } = globalState
 
 export function test_empty_record (expect) {
   const left = record()
@@ -154,4 +197,21 @@ export function test_record_as_map_key (expect) {
   expect(map.get(record({ x: 1, y: 2 }))).toEqual('foo')
   expect(map.get(tuple(3, 4))).toEqual('bar')
   expect(map.get(record({ x: 1, y: 1 }))).toEqual(undefined)
+}
+
+export function test_record_keys_in_any_order_with_symbols (expect) {
+  const sym1 = Symbol('sym1')
+  const sym2 = Symbol('sym2')
+  const left = record({ x: 1, y: 2, [sym1]: 3, [sym2]: 4 })
+  const right = record({ [sym2]: 4, y: 2, x: 1, [sym1]: 3 })
+  expect(left === right).toEqual(true)
+  expect(left[sym1]).toEqual(3)
+  expect(left[sym2]).toEqual(4)
+}
+
+// Object.entries does not include symbols
+function entriesWithSymbols (object) {
+  const allKeys = Object.keys(object)
+    .concat(Object.getOwnPropertySymbols(object))
+  return allKeys.map((key) => [key, object[key]])
 }
