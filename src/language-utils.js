@@ -12,7 +12,6 @@ export const createLanguage = ({ tokenizer, parser }) => {
     const tokens = Array.from(tokenize(tokenizer, strs, interpolations))
     return parse(parser, tokens)
   }
-  // add `parse`, `withCtx` methods for subparsing
-  //   Object.assign(tts, parser)
+  tts.ast = parser.ast
   return tts
 }

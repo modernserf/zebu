@@ -211,6 +211,12 @@ export function test_lit_matches_values (expect) {
 export const hasProps = (...methods) =>
   matchToken((tok) => tok.value && methods.every((m) => tok.value[m]))
 
+export function test_hasProps_matches_objects (expect) {
+  const parser = hasProps('foo')
+  const tokens = [$t('structure', { foo: 1 })]
+  expect(parse(parser, tokens)).toEqual($t('structure', { foo: 1 }))
+}
+
 /**
  * Object with a test method (e.g. a regular expression).
  * @typedef {{ test: (value: any) => boolean }} Tester

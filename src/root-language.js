@@ -13,7 +13,8 @@ class Quote {
   compile (ctx) {
     const [fn, ...args] = this.values
     if (this.withContext) { args.unshift(ctx) }
-    return fn(...args.map(arg => arg instanceof Quote ? arg.compile(ctx) : arg))
+    const out = fn(...args.map(arg => arg instanceof Quote ? arg.compile(ctx) : arg))
+    return out
   }
 }
 
@@ -46,7 +47,10 @@ const rootParser = Parser.language({
       parser.parse(new ParseSubject([], 0))
       return parser
     }, repeat(p.Rule, 1)),
-    seq((expr) => expr.compile({ ruleMap: {} }), p.AltExpr),
+    seq(
+      (expr) => Object.assign(expr.compile({ ruleMap: {} }), { ast: expr }),
+      p.AltExpr
+    ),
     seq(() => end, end),
   ),
   Rule: (p) => alt(
@@ -96,7 +100,10 @@ const rootParser = Parser.language({
     seq(({ value }) => q(testValue, value), hasProps('test')),
     // named values
     seq(({ value }) => q.withContext(lookup, value), token('identifier')),
-    // TODO: interpolate lang`...` expressions, parsers, etc.
+    // interpolated expressions
+    seq(({ value }) => value.ast, hasProps('ast')),
+    // inlined parsers
+    seq(({ value }) => q(() => value), hasProps('parse'))
   ),
 })
 
@@ -202,24 +209,14 @@ export function test_throw_left_recursion (expect) {
   }).toThrow()
 }
 
-export function skip_test_interpolate_parser (expect) {
-  const num = {
-    parse: ({ tokens, index }) => {
-      if (tokens[index].type === 'number') {
-        return { node: tokens[index].value, index: index + 1 }
-      }
-      return null
-    },
-  }
-  const numWithParens = lang`"(" ${num} ")" ${(_, value) => value}`
-  expect(numWithParens`( 123 )`).toEqual(123)
+export function test_interpolate_parser (expect) {
+  const unwrap = (expr) => lang`"(" ${expr} ")" ${(_, value) => value}`
+  const num = token('number')
+  expect(unwrap(num)`(123)`.value).toEqual(123)
 }
 
-export function skip_test_interpolate_parser_expressions (expect) {
+export function test_interpolate_parser_expressions (expect) {
+  const unwrap = (expr) => lang`"(" ${expr} ")" ${(_, value) => value}`
   const num = lang`number ${({ value }) => value}`
-  expect(num`123`).toEqual(123)
-  expect(num.parse({
-    tokens: [{ type: 'number', value: 123 }],
-    index: 0,
-  })).toEqual({ node: 123, index: 1 })
+  expect(unwrap(num)`( 123 )`).toEqual(123)
 }
