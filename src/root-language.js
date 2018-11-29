@@ -96,6 +96,18 @@ const rootParser = Parser.language({
     seq(() => q(nil), lit('nil')),
     // ( FooExpr )
     seq((_, value) => value, lit('('), p.AltExpr, lit(')')),
+    // { test, ast, parse }
+    seq((_, values) => q(hasProps, ...values),
+      lit('{'),
+      sepBy(
+        seq(
+          ({ value }) => q(lit, value),
+          alt(token('identifier'), token('string'))
+        ),
+        lit(',')
+      ),
+      lit('}')
+    ),
     // "("
     seq(({ value }) => q(lit, value), token('string')),
     // ${/foo+/}
@@ -205,7 +217,7 @@ export function test_lang_multiple_rules (expect) {
   `
 
   expect(math`(-3.1 + 4) * 200`).toEqual((-3.1 + 4) * 200)
-  expect(math`1 / 2 / 3`).toEqual(1 / 2 / 3)
+  expect(math`1 / 2 / 3`).toEqual((1 / 2) / 3)
 }
 
 export function test_throw_left_recursion (expect) {
