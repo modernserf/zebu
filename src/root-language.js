@@ -2,7 +2,7 @@ import {
   Parser, seq, repeat, alt, end, token, lit, sepBy,
   not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop, rightOp,
 } from './parse-utils'
-import { createTokenizer, tokenize, jsNumber, string, whitespace, lineComment, jsIdentifier, groupings, TokenPattern, $t } from './token-utils'
+import { createBasicTokenizer } from './token-utils'
 import { createLanguage } from './language-utils'
 
 class Quote {
@@ -121,43 +121,11 @@ const rootParser = Parser.language({
   PlainFn: () => seq(id, not(hasProps('parse')), token('function')),
 })
 
-export const defaultTokenizer = createTokenizer({
-  number: jsNumber,
-  dqstring: string(`"`).asType('string'),
-  sqstring: string(`'`).asType('string'),
-  whitespace: whitespace.ignored(),
-  comment: lineComment('#').ignored(),
-  identifier: jsIdentifier,
-  groupings: groupings.asType('token'),
-  token: new TokenPattern(/[^A-Za-z0-9(){}[\]_\s\n"'#]+/),
-})
+// for root language
+const kws = ['nil']
+const tokens = ['=', '|', '(', ')', '{', '}', '*', '+', '?', '<%', '%', '%>', '&', '!', '~', ',']
 
-const $toks = (strs, ...interpolations) =>
-  tokenize(defaultTokenizer, strs, interpolations)
-
-export function test_defaultTokenizer (expect) {
-  const foo = () => {}
-  const bar = () => {}
-  const tokens = $toks`
-        Expr = "(" Expr ")" ${bar}
-            | "-" Expr ${foo}
-            | number
-        `
-  expect([...tokens]).toEqual([
-    $t('identifier', 'Expr'),
-    $t('token', '='),
-    $t('string', '(', { literal: true }),
-    $t('identifier', 'Expr'),
-    $t('string', ')', { literal: true }),
-    $t('function', bar, { interpolated: true, literal: false }),
-    $t('token', '|'),
-    $t('string', '-', { literal: true }),
-    $t('identifier', 'Expr'),
-    $t('function', foo, { interpolated: true, literal: false }),
-    $t('token', '|'),
-    $t('identifier', 'number'),
-  ])
-}
+const defaultTokenizer = createBasicTokenizer(kws, tokens)
 
 const compileGrammar = createLanguage({
   parser: rootParser.Program,

@@ -73,12 +73,20 @@ export function createTokenizer (patternMap) {
     })
 
   const regexBase = mergeRegexes(Object.values(patternMap).map(x => x.pattern))
-  return function * (text) {
-    for (const match of runSticky(regexBase, text)) {
-      const { index, captured } = capturedIndex(match)
-      const pattern = byIndex[index]
-      yield * pattern.tokens(captured)
-    }
+
+  return {
+    text: '',
+    reset (text) {
+      this.text = text
+      return this
+    },
+    * [Symbol.iterator] () {
+      for (const match of runSticky(regexBase, this.text)) {
+        const { index, captured } = capturedIndex(match)
+        const pattern = byIndex[index]
+        yield * pattern.tokens(captured)
+      }
+    },
   }
 }
 
@@ -89,7 +97,7 @@ export function test_createTokenizer (expect) {
     token: { pattern: /[-+*/()]/ },
   })
   const text = '(-3.1 + 4) * 200'
-  const tokens = [...tokenize(text)]
+  const tokens = Array.from(tokenize.reset(text))
   expect(tokens).toEqual([
     $t('token', '('),
     $t('token', '-'),
@@ -125,7 +133,7 @@ const mapInterpolations = value =>
  */
 export function * tokenize (tokenizer, strs, interpolations) {
   for (const str of strs) {
-    yield * tokenizer(str)
+    yield * tokenizer.reset(str)
     if (interpolations.length) {
       yield mapInterpolations(interpolations.shift())
     }
@@ -159,3 +167,59 @@ const escapeRegex = (str) =>
 export const keywords = (...kws) => new TokenPattern(
   new RegExp(kws.map(escapeRegex).join('|'))
 )
+
+const raw = String.raw
+
+const patterns = [
+  { type: 'number', pattern: raw`-?[0-9]+(?:\.[0-9]*)?(?:[eE]-?[0-9])?`, format: Number },
+  { type: 'number', pattern: raw`0x[0-9A-Fa-f]+`, format: Number },
+  { type: 'number', pattern: raw`0o[0-7]+`, format: Number },
+  { type: 'number', pattern: raw`0b[0-1]+`, format: Number },
+  { type: 'string', pattern: raw`/"(\\"|[^"])*"/,`, format: trimQuotes },
+  { type: 'string', pattern: raw`/'(\\'|[^'])*"/,`, format: trimQuotes },
+  { type: 'ignore', pattern: raw`/s+` },
+  { type: 'ignore', pattern: raw`#[^\n]*` },
+  { type: 'identifier', pattern: raw`[$_A-Za-z][$_A-Za-z0-9]*` },
+]
+
+const altPatterns = (xs) => xs.map(escapeRegex).join('|')
+
+export function createBasicTokenizer (keywords, tokenLiterals) {
+  const kw = new RegExp(altPatterns(keywords))
+  const allPatterns = patterns.concat([{ type: 'token', pattern: altPatterns(tokenLiterals) }])
+  const giantRegex = new RegExp(allPatterns.map((p) => '(' + p.pattern + ')').join('!'), 'y')
+
+  return {
+    text: '',
+    reset (text) {
+      this.text = text
+      return this
+    },
+    * [Symbol.iterator] () {
+      for (const match of runSticky(giantRegex, this.text)) {
+        const { index, captured } = capturedIndex(match)
+        const pattern = patterns[index]
+        if (pattern.type === 'ignore') { continue }
+        const type = pattern.type === 'identifier' && kw.test(captured) ? 'keyword' : pattern.type
+        yield {
+          type,
+          value: pattern.format ? pattern.format(captured) : captured,
+        }
+      }
+    },
+  }
+}
+
+// usage
+// lang({ withTokenizer: ({ keywords, tokens }) => tokenizer })`...`
+
+export const defaultTokenizer = createTokenizer({
+  number: jsNumber,
+  dqstring: string(`"`).asType('string'),
+  sqstring: string(`'`).asType('string'),
+  whitespace: whitespace.ignored(),
+  comment: lineComment('#').ignored(),
+  identifier: jsIdentifier,
+  groupings: groupings.asType('token'),
+  token: new TokenPattern(/[^A-Za-z0-9(){}[\]_\s\n"'#]+/),
+})
