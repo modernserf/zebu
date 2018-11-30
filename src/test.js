@@ -5,10 +5,10 @@ import * as immutableRecord from './immutable-record'
 
 const modules = [parseUtils, tokenUtils, rootLanguage, immutableRecord]
 
-const assert = require('assert').strict
+const assert = require('assert')
 
 const expect = (value) => ({
-  toEqual: (compare) => assert.deepEqual(value, compare),
+  toEqual: (compare) => assert.deepStrictEqual(value, compare),
   toThrow: (error) => assert.throws(value, error),
 })
 
@@ -28,11 +28,6 @@ async function runTests (modules) {
           passCount++
         } catch (e) {
           console.log('not ok', count, e.message)
-          if (e instanceof assert.AssertionError) {
-            break
-          } else {
-            throw e
-          }
         }
       }
     }
