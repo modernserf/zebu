@@ -402,7 +402,7 @@ export function test_rightOp (expect) {
 export const not = (parser) => new Parser((subject) =>
   parser.parse(subject).ok
     ? subject.error(['unexpected', parser])
-    : subject.output(null))
+    : subject.output(DROP))
 
 /**
  * match if the parser succeeds, but do not consume input.
@@ -410,7 +410,7 @@ export const not = (parser) => new Parser((subject) =>
  */
 export const peek = (parser) => new Parser((subject) =>
   parser.parse(subject).ok
-    ? subject.output(null)
+    ? subject.output(DROP)
     : subject.error(['expected', parser]))
 
 /**

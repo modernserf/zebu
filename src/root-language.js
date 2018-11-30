@@ -72,7 +72,7 @@ const rootParser = Parser.language({
     // `FooExpr BarExpr ...` until next rule
     seq(
       (exprs) => q(seq, (x) => x, ...exprs),
-      repeat(seq((_, x) => x, not(p.RuleHead), p.OpExpr), 2),
+      repeat(seq((x) => x, not(p.RuleHead), p.OpExpr), 2),
     ),
     p.OpExpr
   ),
@@ -127,10 +127,10 @@ const rootParser = Parser.language({
     // interpolated expressions
     seq(({ value }) => value.ast, hasProps('ast')),
     // inlined parsers
-    seq((_, { value }) => q(() => value), not(hasProps('ast')), hasProps('parse'))
+    seq(({ value }) => q(() => value), not(hasProps('ast')), hasProps('parse'))
   ),
   PlainFn: (p) => seq(
-    (_, value) => value,
+    (value) => value,
     not(hasProps('parse')), token('function')
   ),
 })
@@ -197,7 +197,7 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`~"(" number ")"`
+  const num = lang`~"(" number ")" ${({ value }) => value}`
   expect(num`(123)`).toEqual(123)
 }
 
@@ -276,7 +276,7 @@ export function test_interpolate_regex (expect) {
 }
 
 export function test_lookahead (expect) {
-  const optionalSemis = lang`(!";" token ${(_, x) => x.value})+ ";"? ${(xs) => xs}`
+  const optionalSemis = lang`(!";" token ${(x) => x.value})+ ";"? ${(xs) => xs}`
   expect(optionalSemis`+ *`).toEqual(['+', '*'])
   expect(optionalSemis`+ * ;`).toEqual(['+', '*'])
 }
