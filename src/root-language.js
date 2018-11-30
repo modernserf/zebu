@@ -1,6 +1,6 @@
 import {
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop,
+  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop, rightOp,
 } from './parse-utils'
 import { createTokenizer, tokenize, jsNumber, string, whitespace, lineComment, jsIdentifier, groupings, TokenPattern, $t } from './token-utils'
 import { createLanguage } from './language-utils'
@@ -30,6 +30,10 @@ const lookup = (ctx, value) => {
   return ctx.ruleMap[value]
 }
 
+const id = (x) => x
+const prefix = (op, text, Expr) => seq((expr) => q(op, expr), drop(lit(text)), Expr)
+const postfix = (op, Expr, text) => seq((parser) => q(op, parser), Expr, lit(text))
+
 const rootParser = Parser.language({
   Program: (p) => alt(
     seq((rules) => {
@@ -55,7 +59,7 @@ const rootParser = Parser.language({
     seq((name, rule) => ({ name, rule }), p.RuleHead, p.AltExpr),
     // TODO: handle interpolation of rules
   ),
-  RuleHead: (p) => seq(
+  RuleHead: () => seq(
     ({ value }) => value, token('identifier'), lit('=')
   ),
   AltExpr: (p) => seq(
@@ -64,8 +68,8 @@ const rootParser = Parser.language({
     sepBy(p.SeqExpr, lit('|'))
   ),
   SeqExpr: (p) => seq(
-    (exprs, mapFn = {}) => q(seq, mapFn.value || ((x) => x), ...exprs),
-    repeat(seq((x) => x, not(p.RuleHead), p.OpExpr), 1),
+    (exprs, mapFn = { value: id }) => q(seq, mapFn.value, ...exprs),
+    repeat(seq(id, not(p.RuleHead), p.OpExpr), 1),
     maybe(p.PlainFn)
   ),
   OpExpr: (p) => alt(
@@ -73,34 +77,27 @@ const rootParser = Parser.language({
       p.RepExpr,
       alt(
         seq(() => (l, r) => q(leftOp, l, r), lit('<%')),
-        seq(() => (l, r) => q(leftOp, l, r), lit('%>')),
+        seq(() => (l, r) => q(rightOp, l, r), lit('%>')),
         seq(() => (l, r) => q(sepBy, l, r), lit('%')),
       )
     )
   ),
   RepExpr: (p) => alt(
-    // FooExpr *
-    seq((parser) => q(repeat, parser, 0), p.Expr, lit('*')),
-    // BarExpr +
-    seq((parser) => q(repeat, parser, 1), p.Expr, lit('+')),
-    // QuuxExpr ?
-    seq((parser) => q(maybe, parser), p.Expr, lit('?')),
+    postfix((x) => repeat(x, 0), p.Expr, '*'),
+    postfix((x) => repeat(x, 1), p.Expr, '+'),
+    postfix(maybe, p.Expr, '?'),
     p.Expr
   ),
   Expr: (p) => alt(
-    // !FooExpr
-    seq((_, expr) => q(not, expr), lit('!'), p.Expr),
-    // &BarExpr
-    seq((_, expr) => q(peek, expr), lit('&'), p.Expr),
-    // ~QuuxExpr
-    seq((_, expr) => q(drop, expr), lit('~'), p.Expr),
-    // nil
+    prefix(not, '!', p.Expr),
+    prefix(drop, '~', p.Expr),
+    prefix(peek, '&', p.Expr),
     seq(() => nil, lit('nil')),
     // ( FooExpr )
-    seq((_, value) => value, lit('('), p.AltExpr, lit(')')),
+    seq(id, drop(lit('(')), p.AltExpr, lit(')')),
     // { test, ast, parse }
-    seq((_, values) => q(hasProps, ...values),
-      lit('{'),
+    seq((values) => q(hasProps, ...values),
+      drop(lit('{')),
       sepBy(
         seq(
           ({ value }) => q(lit, value),
@@ -121,10 +118,7 @@ const rootParser = Parser.language({
     // inlined parsers
     seq(({ value }) => q(() => value), not(hasProps('ast')), hasProps('parse'))
   ),
-  PlainFn: (p) => seq(
-    (value) => value,
-    not(hasProps('parse')), token('function')
-  ),
+  PlainFn: () => seq(id, not(hasProps('parse')), token('function')),
 })
 
 export const defaultTokenizer = createTokenizer({
@@ -142,11 +136,11 @@ const $toks = (strs, ...interpolations) =>
   tokenize(defaultTokenizer, strs, interpolations)
 
 export function test_defaultTokenizer (expect) {
-  const neg = (_, value) => -value
-  const _2 = (_, value) => value
+  const foo = () => {}
+  const bar = () => {}
   const tokens = $toks`
-        Expr = "(" Expr ")" ${_2}
-            | "-" Expr ${neg}
+        Expr = "(" Expr ")" ${bar}
+            | "-" Expr ${foo}
             | number
         `
   expect([...tokens]).toEqual([
@@ -155,11 +149,11 @@ export function test_defaultTokenizer (expect) {
     $t('string', '(', { literal: true }),
     $t('identifier', 'Expr'),
     $t('string', ')', { literal: true }),
-    $t('function', _2, { interpolated: true, literal: false }),
+    $t('function', bar, { interpolated: true, literal: false }),
     $t('token', '|'),
     $t('string', '-', { literal: true }),
     $t('identifier', 'Expr'),
-    $t('function', neg, { interpolated: true, literal: false }),
+    $t('function', foo, { interpolated: true, literal: false }),
     $t('token', '|'),
     $t('identifier', 'number'),
   ])
@@ -214,8 +208,8 @@ export function test_lang_multiple_rules (expect) {
     MulOp   = "*" ${() => (l, r) => l * r}
             | "/" ${() => (l, r) => l / r}
     Expr    = ~"(" AddExpr ")"
-            | ~"-" Expr        ${(value) => -value}
-            | number          ${({ value }) => value}
+            | ~"-" Expr  ${(value) => -value}
+            | number     ${({ value }) => value}
   `
 
   expect(math`(-3.1 + 4) * 200`).toEqual((-3.1 + 4) * 200)
@@ -250,19 +244,19 @@ export function test_throw_left_recursion (expect) {
 }
 
 export function test_interpolate_parser (expect) {
-  const unwrap = (expr) => lang`"(" ${expr} ")" ${(_, value) => value}`
+  const unwrap = (expr) => lang`~"(" ${expr} ")" ${(value) => value}`
   const num = token('number')
   expect(unwrap(num)`(123)`.value).toEqual(123)
 }
 
 export function test_interpolate_parser_expressions (expect) {
-  const unwrap = (expr) => lang`"(" ${expr} ")" ${(_, value) => value}`
+  const unwrap = (expr) => lang`~"(" ${expr} ")" ${(value) => value}`
   const num = lang`number ${({ value }) => value}`
   expect(unwrap(num)`( 123 )`).toEqual(123)
 }
 
 export function test_interpolate_regex (expect) {
-  const range = lang`number ${/\.+/} number ${(a, _, b) => [a.value, b.value]}`
+  const range = lang`number ~${/\.+/} number ${(a, b) => [a.value, b.value]}`
   expect(range`1 .. 2`).toEqual([1, 2])
   expect(range`1 ..... 2`).toEqual([1, 2])
 }
