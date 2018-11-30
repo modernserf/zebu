@@ -239,7 +239,7 @@ const DROP = Symbol('DROP')
 export const seq = (mapFn, ...parsers) => new MemoParser((subject) => {
   const out = []
   for (const p of parsers) {
-    if (!p.parse) { console.warn('parser:', p, subject) }
+    if (!p.parse) { console.warn('not a parser:', p, subject) }
     const res = p.parse(subject)
     if (!res.ok) { return res }
     if (res.node !== DROP) {

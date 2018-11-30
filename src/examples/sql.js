@@ -1,40 +1,33 @@
 import { lang } from '../root-language'
-import { sepBy } from '../parse-utils'
 
-const op2 = (left, op, right) => ({ left, op, right })
-const _2 = (_, x) => x
+const op2 = (op) => (left, right) => ({ left, op, right })
 
 export const sql = lang`
-  Query = ("SELECT" Selection ${_2})
-          ("FROM Sources ${_2})
-          ("WHERE" Where ${_2})?
+  Query = ~"SELECT" (Selector % ",")
+          ~"FROM (Source % ",")
+          (~"WHERE" Where)?
             ${(select, from, where) => ({ select, from, where })}
 
-  Selection   = ${sepBy(lang`AsSelector`, lang`","`)}
-  AsSelector  = DotSelector "AS" Ident 
-                  ${({ table, column }, _, as) => ({ table, column, as })}
+  Selector    = DotSelector ~"AS" Ident 
+                  ${({ table, column }, as) => ({ table, column, as })}
               | DotSelector
-  DotSelector = Ident "." Ident 
-                  ${(table, _, column) => ({ table, column })}
+  DotSelector = Ident ~"." Ident 
+                  ${(table, column) => ({ table, column })}
               | Ident ${(column) => ({ column })}
 
-  Sources  = ${sepBy(lang`AsSource`, lang`","`)}
-  AsSource = Ident "AS" Ident ${(table, _, as) => ({ table, as })}
-           | Ident ${(table) => (table)}
+  Source = Ident ~"AS" Ident ${(table, as) => ({ table, as })}
+         | Ident ${(table) => ({ table })}
 
-  Where     = WhereAnd "OR" Where ${op2}
-            | WhereAnd
-  WhereAnd  = WhereComp "AND" WhereAnd ${op2}
-            | WhereComp
-  WhereComp = WhereExpr CompOp WhereExpr ${op2}
-            | WhereExpr
-  WhereExpr = "(" Where ")" ${_2}
-            | Ident "." Ident ${(table, _, column) => ({ table, column })}
+  Where     = WhereAnd <% ("OR" ${op2('OR')})
+  WhereAnd  = WhereComp <% ("AND" ${op2('AND')})
+  WhereComp = WhereExpr <% CompOp
+  WhereExpr = ~"(" Where ")"
+            | Ident ~"." Ident ${(table, column) => ({ table, column })}
             | Ident ${(column) => ({ column })}
             | number
             | string
 
-  CompOp = (">" | ">=" | "<" | "<=" | "=") ${({ value }) => value}
+  CompOp = (">" | ">=" | "<" | "<=" | "=") ${({ value: op }) => op2(op)}
 
   Ident = identifier ${({ value }) => value}
 `

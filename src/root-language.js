@@ -63,18 +63,10 @@ const rootParser = Parser.language({
     (alts) => q(alt, ...alts),
     sepBy(p.SeqExpr, lit('|'))
   ),
-  SeqExpr: (p) => alt(
-    // `FooExpr BarExpr ${mapFn}`
-    seq(
-      (exprs, { value: mapFn }) => q(seq, mapFn, ...exprs),
-      repeat(p.OpExpr, 1), p.PlainFn
-    ),
-    // `FooExpr BarExpr ...` until next rule
-    seq(
-      (exprs) => q(seq, (x) => x, ...exprs),
-      repeat(seq((x) => x, not(p.RuleHead), p.OpExpr), 2),
-    ),
-    p.OpExpr
+  SeqExpr: (p) => seq(
+    (exprs, mapFn = {}) => q(seq, mapFn.value || ((x) => x), ...exprs),
+    repeat(seq((x) => x, not(p.RuleHead), p.OpExpr), 1),
+    maybe(p.PlainFn)
   ),
   OpExpr: (p) => alt(
     leftOp(

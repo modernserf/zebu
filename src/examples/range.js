@@ -1,7 +1,5 @@
 import { lang } from '../root-language'
 
-const _2 = (_, x) => x
-
 const interval = (exclude) => (value, _, end) => ({
   value,
   interval: end - value,
@@ -30,13 +28,12 @@ function * doRange (
 
 export const range = lang`
   OpenRange = Start "..." ${doRange}
-            | Range "," OpenRange 
-              ${function * (l, _, r) { yield * l; yield * r }}
+            | Range ~"," OpenRange 
+              ${function * (l, r) { yield * l; yield * r }}
             | Range
 
   Range = Start "..." End ${doRange}
-        | Value ("," Value ${_2})*
-          ${function * (x, xs) { yield x; yield * xs }}
+        | Value % ","
 
   Start = ExcludeValue "," Value ${interval(true)}
         | Value "," Value ${interval(false)}
@@ -44,6 +41,6 @@ export const range = lang`
   End   = ExcludeValue ${(value) => ({ value, exclude: true })}
         | number
 
-  ExcludeValue = "(" Value ")" ${_2}
+  ExcludeValue = ~"(" Value ")"
   Value        = number ${({ value }) => value}
 `

@@ -23,8 +23,8 @@ const asValue = ({ value }) => ({ type: 'value', value })
 
 export const sicp = lang.withConfig({ tokenizer: lispTokenizer })`
     Prog = Expr * ${lispInterpreter}
-    Expr = "'" Expr ${(_, value) => asValue(value)}
-         | "(" Expr* ")" ${(_, value) => ({ type: 'expr', value })}
+    Expr = ~"'" Expr ${asValue}
+         | ~"(" Expr* ")" ${(value) => ({ type: 'expr', value })}
          | string   ${asValue}
          | number   ${asValue}
          | function ${asValue} # interpolate JS fns as macros,

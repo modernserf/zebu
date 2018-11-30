@@ -3,21 +3,20 @@ import { lang } from '../root-language'
 export const lang2 = lang`
   Program  = Rule*
            | AltExpr
-  Rule     = identifier "=" ~ AltExpr
+  Rule     = RuleHead AltExpr
+  RuleHead = identifier "="
   AltExpr  = SeqExpr % "|"
-  SeqExpr  = OpExpr+ PlainFn
-           | OpExpr
+  SeqExpr  = (!RuleHead OpExpr)+ PlainFn?
   OpExpr   = RepExpr <% ("<%" | "%" | "%>")
-  RepExpr  = DropExpr ("*" | "+" | "?" | nil)
-  DropExpr = Expr <% "~"
-  Expr     = ("!" | "&") Expr
-           | "(" ~ Expr ")"
-           | "{" ~ (identifier | string) % "," "}" 
+  RepExpr  = Expr ("*" | "+" | "?" | nil)
+  Expr     = ("!" | "&" | "~") Expr
+           | ~"(" Expr ")"
+           | ~"{" (identifier | string) % "," "}" 
            | { test }
            | { ast }
-           | { parse }
+           | !{ ast } { parse }
            | string
            | identifier
            | "nil"
-  PlainFn  = !{ parse } ~ function
+  PlainFn  = !{ parse } function
 `
