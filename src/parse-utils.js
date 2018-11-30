@@ -229,6 +229,7 @@ export function test_hasProps_matches_objects (expect) {
 export const testValue = (tester) =>
   matchToken((tok) => tester.test(tok.value))
 
+const DROP = Symbol('DROP')
 /**
  * matches if each in a sequence of parsers matches.
  * outputs mapFn(subject, ...outputs).
@@ -241,11 +242,15 @@ export const seq = (mapFn, ...parsers) => new MemoParser((subject) => {
     if (!p.parse) { console.warn('parser:', p, subject) }
     const res = p.parse(subject)
     if (!res.ok) { return res }
-    out.push(res.node)
+    if (res.node !== DROP) {
+      out.push(res.node)
+    }
     subject = subject.update(res)
   }
   return subject.output(mapFn(...out))
 })
+
+export const drop = (parser) => seq(() => DROP, parser)
 
 export function test_seq_matches_a_sequence (expect) {
   const parser = seq((_, value) => value, lit('('), token('foo'), lit(')'))

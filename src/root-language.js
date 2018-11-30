@@ -1,6 +1,6 @@
 import {
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp,
+  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop,
 } from './parse-utils'
 import { createTokenizer, tokenize, jsNumber, string, whitespace, lineComment, jsIdentifier, groupings, TokenPattern, $t } from './token-utils'
 import { createLanguage } from './language-utils'
@@ -66,22 +66,15 @@ const rootParser = Parser.language({
       (exprs, { value: mapFn }) => q(seq, mapFn, ...exprs),
       repeat(p.OpExpr, 1), p.PlainFn
     ),
-    p.DropExpr
-  ),
-  DropExpr: (p) => alt(
-    // seq(
-    //   (_, __, x) => x,
-    //   p.OpExpr, lit('~'), p.DropExpr
-    // ),
-    seq((x) => x, p.OpExpr),
+    p.OpExpr
   ),
   OpExpr: (p) => alt(
     leftOp(
       p.RepExpr,
       alt(
         seq(() => (l, r) => q(leftOp, l, r), lit('<%')),
-        // seq(() => (l, r) => q(leftOp, l, r), lit('%>')),
-        // seq(() => (l, r) => q(sepBy, l, r), lit('%')),
+        seq(() => (l, r) => q(leftOp, l, r), lit('%>')),
+        seq(() => (l, r) => q(sepBy, l, r), lit('%')),
       )
     )
   ),
@@ -99,22 +92,24 @@ const rootParser = Parser.language({
     seq((_, expr) => q(not, expr), lit('!'), p.Expr),
     // &BarExpr
     seq((_, expr) => q(peek, expr), lit('&'), p.Expr),
+    // ~QuuxExpr
+    seq((_, expr) => q(drop, expr), lit('~'), p.Expr),
     // nil
     seq(() => nil, lit('nil')),
     // ( FooExpr )
     seq((_, value) => value, lit('('), p.AltExpr, lit(')')),
-    // // { test, ast, parse }
-    // seq((_, values) => q(hasProps, ...values),
-    //   lit('{'),
-    //   sepBy(
-    //     seq(
-    //       ({ value }) => q(lit, value),
-    //       alt(token('identifier'), token('string'))
-    //     ),
-    //     lit(',')
-    //   ),
-    //   lit('}')
-    // ),
+    // { test, ast, parse }
+    seq((_, values) => q(hasProps, ...values),
+      lit('{'),
+      sepBy(
+        seq(
+          ({ value }) => q(lit, value),
+          alt(token('identifier'), token('string'))
+        ),
+        lit(',')
+      ),
+      lit('}')
+    ),
     // "("
     seq(({ value }) => q(lit, value), token('string')),
     // ${/foo+/}
@@ -194,14 +189,14 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`"(" number ")" ${(_, { value }) => value}`
+  const num = lang`~"(" number ")" ${({ value }) => value}`
   expect(num`(123)`).toEqual(123)
 }
 
 export function test_lang_single_recursive_rule (expect) {
   const math = lang`
-      Expr = "(" Expr ")" ${(_, value) => value}
-           | "-" Expr     ${(_, value) => -value}
+      Expr = ~"(" Expr ")" ${(value) => value}
+           | ~"-" Expr     ${(value) => -value}
            | number       ${({ value }) => value}
     `
   expect(math`123`).toEqual(123)
@@ -218,8 +213,8 @@ export function test_lang_multiple_rules (expect) {
     MulExpr = Expr <% MulOp
     MulOp   = "*" ${() => (l, r) => l * r}
             | "/" ${() => (l, r) => l / r}
-    Expr    = "(" AddExpr ")" ${(_, value) => value}
-            | "-" Expr        ${(_, value) => -value}
+    Expr    = ~"(" AddExpr ")" ${(value) => value}
+            | ~"-" Expr        ${(value) => -value}
             | number          ${({ value }) => value}
   `
 
@@ -229,13 +224,13 @@ export function test_lang_multiple_rules (expect) {
 
 export function test_lang_repeaters (expect) {
   const list = lang`
-    Expr = "(" Expr* ")" ${(_, xs) => xs}
+    Expr = ~"(" Expr* ")" ${(xs) => xs}
          | identifier    ${({ value }) => value}
   `
   expect(list`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
   const nonEmptyList = lang`
-    Expr = "(" Expr+ ")" ${(_, xs) => xs}
+    Expr = ~"(" Expr+ ")" ${(xs) => xs}
          | identifier    ${({ value }) => value}
   `
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
@@ -243,7 +238,7 @@ export function test_lang_repeaters (expect) {
 }
 
 export function test_lang_maybe (expect) {
-  const trailingCommas = lang`number "," number ","? ${(a, _, b) => [a.value, b.value]}`
+  const trailingCommas = lang`number ~"," number ","? ${(a, b) => [a.value, b.value]}`
   expect(trailingCommas`1, 2`).toEqual([1, 2])
   expect(trailingCommas`1, 2,`).toEqual([1, 2])
 }
