@@ -191,11 +191,11 @@ export function test_token_matches_a_type (expect) {
 }
 
 /**
- * matches if token.value === string, and token is not itself a literal.
+ * matches if token.value === string, and token is not itself a string.
  * @param {string} string
  */
 export const lit = (string) => matchToken(
-  tok => tok.value === string && !tok.meta.literal,
+  tok => tok.value === string && tok.type !== 'string',
   ['did not match value', lit])
 
 export function test_lit_matches_values (expect) {
