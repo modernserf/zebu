@@ -52,8 +52,11 @@ const rootParser = Parser.language({
   ),
   Rule: (p) => alt(
     // FooExpr = BarExpr number
-    seq(({ value: name }, _, rule) => ({ name, rule }), token('identifier'), lit('='), p.AltExpr),
+    seq((name, rule) => ({ name, rule }), p.RuleHead, p.AltExpr),
     // TODO: handle interpolation of rules
+  ),
+  RuleHead: (p) => seq(
+    ({ value }) => value, token('identifier'), lit('=')
   ),
   AltExpr: (p) => seq(
     // FooExpr | BarExpr
@@ -65,6 +68,11 @@ const rootParser = Parser.language({
     seq(
       (exprs, { value: mapFn }) => q(seq, mapFn, ...exprs),
       repeat(p.OpExpr, 1), p.PlainFn
+    ),
+    // `FooExpr BarExpr ...` until next rule
+    seq(
+      (exprs) => q(seq, (x) => x, ...exprs),
+      repeat(seq((_, x) => x, not(p.RuleHead), p.OpExpr), 2),
     ),
     p.OpExpr
   ),
@@ -189,13 +197,13 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`~"(" number ")" ${({ value }) => value}`
+  const num = lang`~"(" number ")"`
   expect(num`(123)`).toEqual(123)
 }
 
 export function test_lang_single_recursive_rule (expect) {
   const math = lang`
-      Expr = ~"(" Expr ")" ${(value) => value}
+      Expr = ~"(" Expr ")"
            | ~"-" Expr     ${(value) => -value}
            | number       ${({ value }) => value}
     `
@@ -207,13 +215,13 @@ export function test_lang_single_recursive_rule (expect) {
 
 export function test_lang_multiple_rules (expect) {
   const math = lang`
-    AddExpr = (MulExpr <% AddOp)
+    AddExpr = MulExpr <% AddOp
     AddOp   = "+" ${() => (l, r) => l + r}
             | "-" ${() => (l, r) => l - r}
     MulExpr = Expr <% MulOp
     MulOp   = "*" ${() => (l, r) => l * r}
             | "/" ${() => (l, r) => l / r}
-    Expr    = ~"(" AddExpr ")" ${(value) => value}
+    Expr    = ~"(" AddExpr ")"
             | ~"-" Expr        ${(value) => -value}
             | number          ${({ value }) => value}
   `
@@ -224,13 +232,13 @@ export function test_lang_multiple_rules (expect) {
 
 export function test_lang_repeaters (expect) {
   const list = lang`
-    Expr = ~"(" Expr* ")" ${(xs) => xs}
+    Expr = ~"(" Expr* ")"
          | identifier    ${({ value }) => value}
   `
   expect(list`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
   const nonEmptyList = lang`
-    Expr = ~"(" Expr+ ")" ${(xs) => xs}
+    Expr = ~"(" Expr+ ")"
          | identifier    ${({ value }) => value}
   `
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
