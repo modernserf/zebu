@@ -205,7 +205,7 @@ export function test_lit_matches_values (expect) {
 }
 
 /**
- * matches if token.value has props with these names.
+ * matches if token.value has truthy-valued props with these names.
  * @param  {...string} methods
  */
 export const hasProps = (...methods) =>

@@ -3,7 +3,7 @@ import {
   not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop, rightOp,
 } from './parse-utils'
 import { createBasicTokenizer, tokenize } from './token-utils'
-import { createLanguage } from './language-utils'
+import { createMetalanguage } from './language-utils'
 
 class Quote {
   constructor (values, withContext) {
@@ -30,26 +30,36 @@ const lookup = (ctx, value) => {
   return ctx.ruleMap[value]
 }
 
+const captureLiteral = (ctx, value) => {
+  if (!ctx.literals[value]) {
+    ctx.literals[value] = lit(value)
+  }
+  return ctx.literals[value]
+}
+
 const id = (x) => x
 const prefix = (op, text, Expr) => seq((expr) => q(op, expr), drop(lit(text)), Expr)
 const postfix = (op, Expr, text) => seq((parser) => q(op, parser), Expr, lit(text))
 
+const initContext = () => ({ ruleMap: {}, literals: {} })
+
 const rootParser = Parser.language({
   Program: (p) => alt(
     seq((rules) => {
-      const ruleMap = {}
+      const { ruleMap, literals } = initContext()
       for (const { name, rule } of rules) {
         ruleMap[name] = rule
       }
       const ast = ruleMap[rules[0].name]
-      const parser = ast.compile({ ruleMap })
+      const parser = ast.compile({ ruleMap, literals })
       // force evaluation of parser (otherwise parser won't even build until its used!)
       // this also proactively finds parse errors
       parser.parse(new ParseSubject([], 0))
+      parser.literals = Object.keys(literals)
       return parser
     }, repeat(p.Rule, 1)),
     seq(
-      (expr) => Object.assign(expr.compile({ ruleMap: {} }), { ast: expr }),
+      (expr) => Object.assign(expr.compile(initContext()), { ast: expr }),
       p.AltExpr
     ),
     seq(() => end, end),
@@ -108,7 +118,7 @@ const rootParser = Parser.language({
       lit('}')
     ),
     // "("
-    seq(({ value }) => q(lit, value), token('string')),
+    seq(({ value }) => q.withContext(captureLiteral, value), token('string')),
     // ${/foo+/}
     seq(({ value }) => q(testValue, value), hasProps('test')),
     // named values
@@ -122,10 +132,15 @@ const rootParser = Parser.language({
 })
 
 // for root language
-const kws = ['nil']
-const tokens = ['=', '|', '(', ')', '{', '}', '*', '+', '?', '<%', '%', '%>', '&', '!', '~', ',']
+const literals = ['nil', '=', '|', '(', ')', '{', '}', '*', '+', '?', '<%', '%', '%>', '&', '!', '~', ',']
 
-const defaultTokenizer = createBasicTokenizer(kws, tokens)
+const defaultTokenizer = createBasicTokenizer(literals)
+
+export const lang = createMetalanguage({
+  parser: rootParser.Program,
+  getTokenizer: createBasicTokenizer,
+  literals,
+})
 
 export function test_defaultTokenizer (expect) {
   const $t = (type, value, rest = {}) => ({ type, value, ...rest })
@@ -155,24 +170,6 @@ export function test_defaultTokenizer (expect) {
   ])
 }
 
-const compileGrammar = createLanguage({
-  parser: rootParser.Program,
-  tokenizer: defaultTokenizer,
-})
-
-export const lang = (strs, ...interpolations) =>
-  createLanguage({
-    parser: compileGrammar(strs, ...interpolations),
-    tokenizer: defaultTokenizer,
-  })
-
-lang.withConfig = options => (strs, ...interpolations) =>
-  createLanguage({
-    parser: compileGrammar(strs, ...interpolations),
-    tokenizer: defaultTokenizer,
-    ...options,
-  })
-
 export function test_lang_nil_language (expect) {
   const nil = lang``
   expect(nil``).toEqual(null)
@@ -183,7 +180,7 @@ export function test_lang_single_expression (expect) {
   expect(num`(123)`).toEqual(123)
 }
 
-export function skip_test_lang_single_recursive_rule (expect) {
+export function test_lang_single_recursive_rule (expect) {
   const math = lang`
       Expr = ~"(" Expr ")"
            | ~"-" Expr     ${(value) => -value}
@@ -195,7 +192,7 @@ export function skip_test_lang_single_recursive_rule (expect) {
   expect(math`-(-(123))`).toEqual(123)
 }
 
-export function skip_test_lang_multiple_rules (expect) {
+export function test_lang_multiple_rules (expect) {
   const math = lang`
     AddExpr = MulExpr <% AddOp
     AddOp   = "+" ${() => (l, r) => l + r}
@@ -251,7 +248,7 @@ export function test_interpolate_parser_expressions (expect) {
   expect(unwrap(num)`( 123 )`).toEqual(123)
 }
 
-export function skip_test_interpolate_regex (expect) {
+export function test_interpolate_regex (expect) {
   const range = lang`number ~${/\.+/} number ${(a, b) => [a.value, b.value]}`
   expect(range`1 .. 2`).toEqual([1, 2])
   expect(range`1 ..... 2`).toEqual([1, 2])

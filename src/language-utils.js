@@ -12,6 +12,25 @@ export const createLanguage = ({ tokenizer, parser }) => {
     const tokens = Array.from(tokenize(tokenizer, strs, interpolations))
     return parse(parser, tokens)
   }
-  tts.ast = parser.ast
+  // attach parser props to tts
+  Object.assign(tts, parser)
   return tts
+}
+
+export const createMetalanguage = ({ getTokenizer, parser, literals }) => {
+  const compileGrammar = createLanguage({
+    parser,
+    tokenizer: getTokenizer(literals),
+  })
+  const lang = (strs, ...interpolations) => {
+    const parser = compileGrammar(strs, ...interpolations)
+    const tokenizer = getTokenizer(parser.literals || [])
+    return createLanguage({ parser, tokenizer })
+  }
+  lang.withConfig = options => (strs, ...interpolations) =>
+    createLanguage({
+      parser: compileGrammar(strs, ...interpolations),
+      ...options,
+    })
+  return lang
 }

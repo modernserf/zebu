@@ -65,10 +65,22 @@ const tokensCatchAll = {
 
 const altPatterns = (xs) => xs.map(escapeRegex).join('|')
 
-export function createBasicTokenizer (keywords, tokenLiterals) {
-  const kw = new RegExp(altPatterns(keywords))
+function partition (xs, fn) {
+  const trues = []
+  const falses = []
+  for (const x of xs) {
+    if (fn(x)) { trues.push(x) } else { falses.push(x) }
+  }
+  return [trues, falses]
+}
+
+export function createBasicTokenizer (literals) {
+  const [keywords, tokens] = partition(literals, (x) => /^[$_A-Za-z]/.test(x))
+  const tokenRE = new RegExp(altPatterns(tokens))
   const allPatterns = patterns.concat([
-    { type: 'token', pattern: altPatterns(tokenLiterals) },
+    // match known literals (that don't also match identifiers)
+    { type: 'token', pattern: tokenRE },
+    // match anything else
     tokensCatchAll,
   ])
   const giantRegex = new RegExp(
@@ -87,10 +99,8 @@ export function createBasicTokenizer (keywords, tokenLiterals) {
         const { index, captured } = capturedIndex(match)
         const pattern = allPatterns[index]
         if (pattern.type === 'ignore') { continue }
-        const type = pattern.type === 'identifier' && kw.test(captured)
-          ? 'keyword'
-          : pattern.type
-
+        const type = (pattern.type === 'identifier' &&
+          keywords.includes(captured)) ? 'keyword' : pattern.type
         yield {
           type,
           value: pattern.format ? pattern.format(captured) : captured,
