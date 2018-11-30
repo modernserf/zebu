@@ -129,7 +129,7 @@ export const defaultTokenizer = createTokenizer({
   comment: lineComment('#').ignored(),
   identifier: jsIdentifier,
   groupings: groupings.asType('token'),
-  token: new TokenPattern(/[^A-Za-z0-9(){}[\]_\s\n"']+/),
+  token: new TokenPattern(/[^A-Za-z0-9(){}[\]_\s\n"'#]+/),
 })
 
 const $toks = (strs, ...interpolations) =>

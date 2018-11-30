@@ -1,24 +1,44 @@
 import { lang } from '../root-language'
+import { createTokenizer, string, TokenPattern, lineComment, groupings, jsNumber, keywords } from '../token-utils'
 
-export const critter = lang`
-    Block      = Statement* Expression?
-    Statement  = Keyword Assignment ~"=" Expression
-               | Keyword Expression
-    Keyword    = ~"@" identifier
-    Expression = DotExpr <% operator
-    DotExpr    = FnExpr (~"." DotExpr FnCall?)?
-    FnExpr     = Expr (~"::" Key | FnCall)*
-    FnCall     = ~"(" FnArg* ")" 
-    FnArg      = (Key ":") Expression
-    Expr       = ~"(" Expression ")"
-               | ~"[" ((Key ":")? Expression)* "]"
-               | ~"{" ("|" Param* "|")? Block "}"
-               | ~"#" identifier
+const tokenizer = createTokenizer({
+  number: jsNumber,
+  string: string(`"`).asType(),
+  whitespace: new TokenPattern(/(?:\s\t)+/),
+  newline: new TokenPattern(/\n+/),
+  comment: lineComment(';'),
+  token: keywords('.', '::', ':=', '|', '#'),
+  identifier: new TokenPattern(/[A-Za-z_][^(){}[\]_\s\t\n"'#:.]*/),
+  operator: new TokenPattern(/[^A-Za-z0-9(){}[\]_\s\t\n"'#:.]+/),
+  groupings: groupings,
+})
+
+export const critter = lang.withConfig({ tokenizer })`
+    Program    = _? Block _?
+    Block      = (Statement % NL)? Expression?
+    Statement  = Keyword _ Assignment _ ":=" _ Expression
+               | Keyword _ Expression
+    Keyword    = "@" identifier
+    Expression = DotExpr <% (_ operator _)
+    DotExpr    = FnExpr <% (_? ".")
+    FnExpr     = Expr (_? "::" Key | FnCall)*
+    FnCall     = "(" _? (FnArg % _) _? ")" 
+    FnArg      = (Key ":" _)? Expression
+    Expr       = "(" _? Expression _? ")" # parenthetical
+               | "[" _? ((Key ":")? Expression)* _? "]" # record
+               | "{" _? (FnParms _)? Block _? "}" # fn def
+               | "#" identifier         # keyword
+               | "(" _? operator _? ")" # quoted operator
                | number
                | string
                | identifier
-    Assignment = "[" Param* "]"
+    Assignment = "[" _? Param % _ _? "]"
+               | "(" _? operator _? ")"
                | identifier
-    Param      = Key (~":" identifier)? (~"=" Expression)?
+    FnParams   = "|:" _? Param % _  _? ":|"
+    Param      = Key (":" _ identifier)? (_ "=" _ Expression)?
     Key        = identifier | number
+
+    NL         = (whitespace | comment)* newline _?
+    _          = (whitespace | comment | newline)+
 `
