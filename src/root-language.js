@@ -38,20 +38,18 @@ const captureLiteral = (ctx, value) => {
 }
 
 const id = (x) => x
+const op2 = (op, text) => seq(() => (l, r) => q(op, l, r), lit(text))
 const prefix = (op, text, Expr) => seq((expr) => q(op, expr), drop(lit(text)), Expr)
 const postfix = (op, Expr, text) => seq((parser) => q(op, parser), Expr, lit(text))
 
 const initContext = () => ({ ruleMap: {}, literals: {} })
+const addRule = (ctx, name, rule) => ({ ...ctx, ruleMap: { ...ctx.ruleMap, [name]: rule }, ast: rule })
 
 const rootParser = Parser.language({
   Program: (p) => alt(
     seq((rules) => {
-      const { ruleMap, literals } = initContext()
-      for (const { name, rule } of rules) {
-        ruleMap[name] = rule
-      }
-      const ast = ruleMap[rules[0].name]
-      const parser = ast.compile({ ruleMap, literals })
+      const ctx = rules.reduceRight((ctx, rule) => rule(ctx), initContext())
+      const parser = ctx.ast.compile(ctx)
       // force evaluation of parser (otherwise parser won't even build until its used!)
       // this also proactively finds parse errors
       parser.parse(new ParseSubject([], 0))
@@ -66,8 +64,7 @@ const rootParser = Parser.language({
   ),
   Rule: (p) => alt(
     // FooExpr = BarExpr number
-    seq((name, rule) => ({ name, rule }), p.RuleHead, p.AltExpr),
-    // TODO: handle interpolation of rules?
+    seq((name, rule) => (ctx) => addRule(ctx, name, rule), p.RuleHead, p.AltExpr),
   ),
   RuleHead: () => seq(
     ({ value }) => value, token('identifier'), lit('=')
@@ -80,16 +77,12 @@ const rootParser = Parser.language({
   SeqExpr: (p) => seq(
     (exprs, mapFn = { value: id }) => q(seq, mapFn.value, ...exprs),
     repeat(seq(id, not(p.RuleHead), p.OpExpr), 1),
-    maybe(p.PlainFn)
+    maybe(token('function'))
   ),
   OpExpr: (p) => alt(
     leftOp(
       p.RepExpr,
-      alt(
-        seq(() => (l, r) => q(leftOp, l, r), lit('<%')),
-        seq(() => (l, r) => q(rightOp, l, r), lit('%>')),
-        seq(() => (l, r) => q(sepBy, l, r), lit('%')),
-      )
+      alt(op2(leftOp, '<%'), op2(sepBy, '%'), op2(rightOp, '%>')),
     )
   ),
   RepExpr: (p) => alt(
@@ -120,15 +113,14 @@ const rootParser = Parser.language({
     // "("
     seq(({ value }) => q.withContext(captureLiteral, value), token('string')),
     // ${/foo+/}
-    seq(({ value }) => q(testValue, value), hasProps('test')),
+    seq(({ value }) => testValue(value), hasProps('test')),
     // named values
     seq(({ value }) => q.withContext(lookup, value), token('identifier')),
     // interpolated expressions
     seq(({ value }) => value.ast, hasProps('ast')),
     // inlined parsers
-    seq(({ value }) => q(() => value), not(hasProps('ast')), hasProps('parse'))
+    seq(({ value }) => value, not(hasProps('ast')), hasProps('parse'))
   ),
-  PlainFn: () => seq(id, not(hasProps('parse')), token('function')),
 })
 
 // for root language
