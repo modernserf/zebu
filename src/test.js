@@ -2,8 +2,12 @@ import * as parseUtils from './parse-utils'
 import * as tokenUtils from './token-utils'
 import * as rootLanguage from './root-language'
 import * as immutableRecord from './immutable-record'
+import * as jsonExample from './examples/json'
 
-const modules = [parseUtils, tokenUtils, rootLanguage, immutableRecord]
+const modules = [
+  parseUtils, tokenUtils, rootLanguage, immutableRecord,
+  jsonExample,
+]
 
 const assert = require('assert')
 

@@ -67,7 +67,7 @@ const rootParser = Parser.language({
   Rule: (p) => alt(
     // FooExpr = BarExpr number
     seq((name, rule) => ({ name, rule }), p.RuleHead, p.AltExpr),
-    // TODO: handle interpolation of rules
+    // TODO: handle interpolation of rules?
   ),
   RuleHead: () => seq(
     ({ value }) => value, token('identifier'), lit('=')

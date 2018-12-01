@@ -1,5 +1,4 @@
 import { lang } from '../root-language'
-import { createTokenizer, jsNumber, string, whitespace, lineComment, keywords, TokenPattern } from '../token-utils'
 
 const _eval = (ctx, { type, value }) => ({
   value: () => value,
@@ -10,25 +9,17 @@ const _eval = (ctx, { type, value }) => ({
 const lispInterpreter = (exprs) => (initCtx = baseCtx) =>
   exprs.reduce(({ ctx }, expr) => _eval(ctx, expr), initCtx)
 
-const lispTokenizer = createTokenizer({
-  number: jsNumber,
-  string: string(`"`),
-  whitespace: whitespace.ignored(),
-  comment: lineComment(';').ignored(),
-  token: keywords(`'`, `(`, `)`),
-  identifier: new TokenPattern(/[^\s\n"';()]+/),
-})
-
 const asValue = ({ value }) => ({ type: 'value', value })
 
-export const sicp = lang.withConfig({ tokenizer: lispTokenizer })`
+export const sicp = lang`
     Prog = Expr * ${lispInterpreter}
-    Expr = ~"'" Expr ${asValue}
+    Expr = ~":" Expr ${asValue}
          | ~"(" Expr* ")" ${(value) => ({ type: 'expr', value })}
          | string   ${asValue}
          | number   ${asValue}
          | function ${asValue} # interpolate JS fns as macros,
          | identifier          # returning { ctx, value }
+    Ident = identifier | (!") 
 `
 
 const fn = (f) => (ctx, ...args) => ({ ctx, value: f(...args) })
