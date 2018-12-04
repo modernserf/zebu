@@ -1,1 +1,1 @@
-export { lang } from './root-language'
+export { lang } from './root-language.mjs'

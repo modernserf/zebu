@@ -1,9 +1,9 @@
 import {
   Parser, seq, repeat, alt, end, token, lit, sepBy,
   not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop, rightOp,
-} from './parse-utils'
-import { createBasicTokenizer, tokenize } from './token-utils'
-import { createMetalanguage } from './language-utils'
+} from './parse-utils.mjs'
+import { createBasicTokenizer, tokenize } from './token-utils.mjs'
+import { createMetalanguage } from './language-utils.mjs'
 
 class Quote {
   constructor (values, withContext) {

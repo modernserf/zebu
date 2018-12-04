@@ -1,5 +1,5 @@
-import { parse } from './parse-utils'
-import { tokenize } from './token-utils'
+import { parse } from './parse-utils.mjs'
+import { tokenize } from './token-utils.mjs'
 
 /**
  * @typedef {(strs: string[], ...any) => any} TaggedTemplateString
