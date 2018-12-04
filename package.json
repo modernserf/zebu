@@ -6,6 +6,7 @@
   "author": "Justin Falcone <justin@justinfalcone.com>",
   "license": "ISC",
   "main": "index.build.js",
+  "module": "src/index.mjs",
   "scripts": {
     "lint": "eslint .",
     "test": "node --experimental-modules src/test.mjs | faucet",
