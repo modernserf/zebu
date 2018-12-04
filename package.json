@@ -8,10 +8,8 @@
   "main": "index.build.js",
   "scripts": {
     "lint": "eslint .",
-    "test": "npm run build:test && node src/test.build.js | faucet",
-    "test:debug": "npm run build:test && node src/test.build.js",
+    "test": "node --experimental-modules src/test.mjs | faucet",
     "build:cjs": "rollup src/index.js -o index.build.js -f cjs",
-    "build:test": "rollup src/test.js -o src/test.build.js -f cjs",
     "watch:test": "watch 'npm test' ./src"
   },
   "devDependencies": {

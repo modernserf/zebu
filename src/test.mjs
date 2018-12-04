@@ -1,3 +1,4 @@
+import assert from 'assert'
 import * as parseUtils from './parse-utils'
 import * as tokenUtils from './token-utils'
 import * as rootLanguage from './root-language'
@@ -9,8 +10,6 @@ const modules = [
   parseUtils, tokenUtils, rootLanguage, immutableRecord,
   jsonExample, typeExample,
 ]
-
-const assert = require('assert')
 
 const expect = (value) => ({
   toEqual: (compare) => assert.deepStrictEqual(value, compare),
