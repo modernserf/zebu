@@ -229,6 +229,10 @@ export function test_hasProps_matches_objects (expect) {
 export const testValue = (tester) =>
   matchToken((tok) => tester.test(tok.value))
 
+const QUOTE = Symbol('QUOTE')
+const quote = (fn, values) => ({ [QUOTE]: () => unquote(fn)(...values.map(unquote)) })
+const unquote = (x) => x && x[QUOTE] ? x[QUOTE]() : x
+
 const DROP = Symbol('DROP')
 /**
  * matches if each in a sequence of parsers matches.
@@ -247,10 +251,15 @@ export const seq = (mapFn, ...parsers) => new MemoParser((subject) => {
     }
     subject = subject.update(res)
   }
-  return subject.output(mapFn(...out))
+  return subject.output(quote(mapFn, out))
 })
 
-export const drop = (parser) => seq(() => DROP, parser)
+export const drop = (parser) => new MemoParser((subject) => {
+  const res = parser.parse(subject)
+  if (!res.ok) { return res }
+  subject = subject.update(res)
+  return subject.output(DROP)
+})
 
 export function test_seq_matches_a_sequence (expect) {
   const parser = seq((_, value) => value, lit('('), token('foo'), lit(')'))
@@ -302,7 +311,7 @@ export const repeat = (parser, min = 0, max = Infinity) => new MemoParser((subje
   if (out.length < min) {
     return subject.error(['not enough items', parser, min])
   }
-  return subject.output(out)
+  return subject.output(quote((...xs) => xs, out))
 })
 
 export function test_repeat (expect) {
@@ -427,5 +436,5 @@ export function parse (parser, tokens) {
   if (res.index !== tokens.length) {
     throw new Error('Leftover tokens')
   }
-  return res.node
+  return unquote(res.node)
 }
