@@ -78,7 +78,7 @@ const rootParser = Parser.language({
   OpExpr: (p) => alt(
     leftOp(
       p.RepExpr,
-      alt(op2(leftOp, '<%'), op2(sepBy, '%'), op2(rightOp, '%>')),
+      op2(leftOp, '<%'),
     )
   ),
   RepExpr: (p) => alt(
@@ -106,8 +106,8 @@ const rootParser = Parser.language({
       ),
       lit('}')
     ),
-    // %%identifier
-    seq(({ value }) => token(value), drop(lit('%%')), token('identifier')),
+    // %identifier
+    seq(({ value }) => token(value), drop(lit('%')), token('identifier')),
     // "("
     seq(({ value }) => lit(value), token('string')),
     // ${/foo+/}
@@ -122,7 +122,7 @@ const rootParser = Parser.language({
 })
 
 // for root language
-const literals = ['nil', '=', '|', '(', ')', '{', '}', '*', '+', '?', '<%', '%', '%>', '&', '!', '~', ',', '%%']
+const literals = ['nil', '=', '|', '(', ')', '{', '}', '*', '+', '?', '<%', '%', '&', '!', '~', ',']
 const rootTokenizer = createBasicTokenizer(literals)
 
 export function lang (strings, ...interpolations) {
@@ -143,7 +143,7 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`~"(" %%number ")" ${({ value }) => value}`
+  const num = lang`~"(" %number ")" ${({ value }) => value}`
   expect(num`(123)`).toEqual(123)
 }
 
@@ -151,7 +151,7 @@ export function test_lang_single_recursive_rule (expect) {
   const math = lang`
       Expr = ~"(" Expr ")"
            | ~"-" Expr     ${(value) => -value}
-           | %%number       ${({ value }) => value}
+           | %number       ${({ value }) => value}
     `
   expect(math`123`).toEqual(123)
   expect(math`-123`).toEqual(-123)
@@ -169,7 +169,7 @@ export function test_lang_multiple_rules (expect) {
             | "/" ${() => (l, r) => l / r}
     Expr    = ~"(" AddExpr ")"
             | ~"-" Expr  ${(value) => -value}
-            | %%number     ${({ value }) => value}
+            | %number     ${({ value }) => value}
   `
 
   expect(math`(-3.1 + 4) * 200`).toEqual((-3.1 + 4) * 200)
@@ -179,27 +179,27 @@ export function test_lang_multiple_rules (expect) {
 export function test_lang_repeaters (expect) {
   const list = lang`
     Expr = ~"(" Expr* ")"
-         | %%identifier    ${({ value }) => value}
+         | %identifier    ${({ value }) => value}
   `
   expect(list`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
   const nonEmptyList = lang`
     Expr = ~"(" Expr+ ")"
-         | %%identifier    ${({ value }) => value}
+         | %identifier    ${({ value }) => value}
   `
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
   expect(() => nonEmptyList`()`).toThrow()
 }
 
 export function test_lang_maybe (expect) {
-  const trailingCommas = lang`%%number ~"," %%number ","? ${(a, b) => [a.value, b.value]}`
+  const trailingCommas = lang`%number ~"," %number ","? ${(a, b) => [a.value, b.value]}`
   expect(trailingCommas`1, 2`).toEqual([1, 2])
   expect(trailingCommas`1, 2,`).toEqual([1, 2])
 }
 
 export function test_throw_left_recursion (expect) {
   expect(() => {
-    lang`FooExpr = FooExpr "*" ${(x) => x} | %%number`
+    lang`FooExpr = FooExpr "*" ${(x) => x} | %number`
   }).toThrow()
 }
 
@@ -211,7 +211,7 @@ export function test_interpolate_parser (expect) {
 
 export function skip_test_interpolate_parser_expressions (expect) {
   const unwrap = (expr) => lang`"(" ${expr} ")" ${(value) => value}`
-  const num = lang`%%number ${({ value }) => value}`
+  const num = lang`%number ${({ value }) => value}`
   expect(unwrap(num)`( 123 )`).toEqual(123)
 }
 
