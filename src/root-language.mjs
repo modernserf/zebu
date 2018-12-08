@@ -1,7 +1,7 @@
 import {
   parse,
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  not, peek, hasProps, maybe, ParseSubject, leftOp, drop,
+  not, peek, hasProps, maybe, ParseSubject, drop,
 } from './parse-utils.mjs'
 import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
@@ -31,7 +31,6 @@ const lookup = (ctx, value) => {
 }
 
 const id = (x) => x
-const op2 = (op, text) => seq(() => (l, r) => q(op, l, r), lit(text))
 const prefix = (op, text, Expr) => seq((expr) => q(op, expr), drop(lit(text)), Expr)
 const postfix = (op, Expr, text) => seq((parser) => q(op, parser), Expr, lit(text))
 
@@ -68,14 +67,8 @@ const rootParser = Parser.language({
   ),
   SeqExpr: (p) => seq(
     (exprs, mapFn = { value: id }) => q(seq, mapFn.value, ...exprs),
-    repeat(seq(id, not(p.RuleHead), p.OpExpr), 1),
+    repeat(seq(id, not(p.RuleHead), p.RepExpr), 1),
     maybe(token('function'))
-  ),
-  OpExpr: (p) => alt(
-    leftOp(
-      p.RepExpr,
-      op2(leftOp, '<%'),
-    )
   ),
   RepExpr: (p) => alt(
     postfix((x) => repeat(x, 0), p.Expr, '*'),
@@ -101,7 +94,7 @@ const rootParser = Parser.language({
 })
 
 // for root language
-const literals = ['nil', '=', '|', '(', ')', '{', '}', '*', '+', '?', '<%', '%', '&', '!', '~', ',']
+const literals = ['nil', '=', '|', '(', ')', '{', '}', '*', '+', '?', '%', '&', '!', '~', ',']
 const rootTokenizer = createBasicTokenizer(literals)
 
 export function lang (strings, ...interpolations) {
@@ -139,21 +132,15 @@ export function test_lang_single_recursive_rule (expect) {
   expect(math`-(-(123))`).toEqual(123)
 }
 
-export function test_lang_multiple_rules (expect) {
-  const math = lang`
-    AddExpr = MulExpr <% AddOp
-    AddOp   = "+" ${() => (l, r) => l + r}
-            | "-" ${() => (l, r) => l - r}
-    MulExpr = Expr <% MulOp
-    MulOp   = "*" ${() => (l, r) => l * r}
-            | "/" ${() => (l, r) => l / r}
-    Expr    = ~"(" AddExpr ")"
-            | ~"-" Expr  ${(value) => -value}
-            | %number
+export function test_lang_multiple_mutually_recursive_rules (expect) {
+  const lisp = lang`
+    Expr     = ~"(" ListBody? ")"
+             | %identifier
+    ListBody = (Expr ListBody ${(head, tail) => [head, tail]})?
   `
-
-  expect(math`(-3.1 + 4) * 200`).toEqual((-3.1 + 4) * 200)
-  expect(math`1 / 2 / 3`).toEqual((1 / 2) / 3)
+  expect(lisp`foo`).toEqual('foo')
+  expect(lisp`()`).toEqual(undefined)
+  expect(lisp`(foo bar)`).toEqual(['foo', ['bar', undefined]])
 }
 
 export function test_lang_repeaters (expect) {

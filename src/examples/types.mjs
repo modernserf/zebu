@@ -1,4 +1,4 @@
-import { lang } from '../index'
+import { lang, leftOp } from '../index'
 
 const t = lang`
   Expression = StringExpr
@@ -8,12 +8,8 @@ const t = lang`
              | ~"(" StringExpr ")"
              | %string
 
-  AddExpr = MulExpr <% AddOp
-  AddOp   = "+" ${() => (l, r) => l + r}
-          | "-" ${() => (l, r) => l - r}
-  MulExpr = Expr <% MulOp
-  MulOp   = "*" ${() => (l, r) => l * r}
-          | "/" ${() => (l, r) => l / r}
+  AddExpr = ${leftOp(lang`MulExpr`, { '+': (l, r) => l + r, '-': (l, r) => l - r })}
+  MulExpr = ${leftOp(lang`Expr`, { '*': (l, r) => l * r, '/': (l, r) => l / r })}
   Expr    = ~"(" AddExpr ")"
           | ~"-" Expr  ${(value) => -value}
           | %number

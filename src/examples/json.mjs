@@ -1,13 +1,7 @@
-import { lang } from '../index'
+import { lang, sepBy } from '../index'
 
 const fromPairs = (pairs = []) =>
   pairs.reduce((obj, [key, value]) => Object.assign(obj, { [key]: value }), {})
-const cons = (h, t) => [h].concat(t)
-const list = (...xs) => xs
-
-const sepBy = (expr, separator) => lang`
-  (${expr} (~${separator} ${expr})* ${cons})
-`
 
 export const json = lang`
   Expr = ~"[" ${sepBy(lang`Expr`, ',')}? "]" ${(xs = []) => xs}
@@ -17,7 +11,7 @@ export const json = lang`
         | "true"  ${() => true}
         | "false" ${() => false}
         | "null"  ${() => null}
-  Pair = %string ~":" Expr ${list} 
+  Pair = %string ~":" Expr ${(k, v) => [k, v]} 
 `
 
 export function test_json (expect) {
