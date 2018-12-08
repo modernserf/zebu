@@ -107,7 +107,7 @@ const rootParser = Parser.language({
       lit('}')
     ),
     // %identifier
-    seq(({ value }) => token(value), drop(lit('%')), token('identifier')),
+    seq(({ value }) => seq(({ value }) => value, token(value)), drop(lit('%')), token('identifier')),
     // "("
     seq(({ value }) => lit(value), token('string')),
     // ${/foo+/}
@@ -143,15 +143,15 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`~"(" %number ")" ${({ value }) => value}`
+  const num = lang`~"(" %number ")"`
   expect(num`(123)`).toEqual(123)
 }
 
 export function test_lang_single_recursive_rule (expect) {
   const math = lang`
       Expr = ~"(" Expr ")"
-           | ~"-" Expr     ${(value) => -value}
-           | %number       ${({ value }) => value}
+           | ~"-" Expr ${(value) => -value}
+           | %number
     `
   expect(math`123`).toEqual(123)
   expect(math`-123`).toEqual(-123)
@@ -169,7 +169,7 @@ export function test_lang_multiple_rules (expect) {
             | "/" ${() => (l, r) => l / r}
     Expr    = ~"(" AddExpr ")"
             | ~"-" Expr  ${(value) => -value}
-            | %number     ${({ value }) => value}
+            | %number
   `
 
   expect(math`(-3.1 + 4) * 200`).toEqual((-3.1 + 4) * 200)
@@ -179,38 +179,38 @@ export function test_lang_multiple_rules (expect) {
 export function test_lang_repeaters (expect) {
   const list = lang`
     Expr = ~"(" Expr* ")"
-         | %identifier    ${({ value }) => value}
+         | %identifier
   `
   expect(list`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
   const nonEmptyList = lang`
     Expr = ~"(" Expr+ ")"
-         | %identifier    ${({ value }) => value}
+         | %identifier
   `
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`).toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
   expect(() => nonEmptyList`()`).toThrow()
 }
 
 export function test_lang_maybe (expect) {
-  const trailingCommas = lang`%number ~"," %number ","? ${(a, b) => [a.value, b.value]}`
+  const trailingCommas = lang`%number ~"," %number ","? ${(a, b) => [a, b]}`
   expect(trailingCommas`1, 2`).toEqual([1, 2])
   expect(trailingCommas`1, 2,`).toEqual([1, 2])
 }
 
 export function test_throw_left_recursion (expect) {
   expect(() => {
-    lang`FooExpr = FooExpr "*" ${(x) => x} | %number`
+    lang`FooExpr = FooExpr "*" | %number`
   }).toThrow()
 }
 
 export function test_interpolate_parser (expect) {
-  const unwrap = (expr) => lang`~"(" ${expr} ")" ${(value) => value}`
+  const unwrap = (expr) => lang`~"(" ${expr} ")"`
   const num = token('number')
   expect(unwrap(num)`(123)`.value).toEqual(123)
 }
 
 export function skip_test_interpolate_parser_expressions (expect) {
-  const unwrap = (expr) => lang`"(" ${expr} ")" ${(value) => value}`
+  const unwrap = (expr) => lang`"(" ${expr} ")"`
   const num = lang`%number ${({ value }) => value}`
   expect(unwrap(num)`( 123 )`).toEqual(123)
 }
