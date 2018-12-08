@@ -1,7 +1,7 @@
 import {
   parse,
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop,
+  not, peek, hasProps, maybe, ParseSubject, leftOp, drop,
 } from './parse-utils.mjs'
 import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
@@ -87,27 +87,12 @@ const rootParser = Parser.language({
     prefix(not, '!', p.Expr),
     prefix(drop, '~', p.Expr),
     prefix(peek, '&', p.Expr),
-    seq(() => nil, lit('nil')),
     // ( FooExpr )
     seq(id, drop(lit('(')), p.AltExpr, lit(')')),
-    // { test, ast, parse }
-    seq((values) => q(hasProps, ...values),
-      drop(lit('{')),
-      sepBy(
-        seq(
-          ({ value }) => q(lit, value),
-          alt(token('identifier'), token('string'))
-        ),
-        lit(',')
-      ),
-      lit('}')
-    ),
     // %identifier
     seq(({ value }) => seq(({ value }) => value, token(value)), drop(lit('%')), token('identifier')),
-    // "("
+    // "foo"
     seq(({ value }) => lit(value), token('string')),
-    // ${/foo+/}
-    seq(({ value }) => testValue(value), hasProps('test')),
     // named values
     seq(({ value }) => q.withContext(lookup, value), token('identifier')),
     // inlined parsers
@@ -213,10 +198,4 @@ export function test_lookahead (expect) {
   const optionalSemis = lang`(!";" ("+" | "*") ${(x) => x.value})+ ";"? ${(xs) => xs}`
   expect(optionalSemis`+ *`).toEqual(['+', '*'])
   expect(optionalSemis`+ * ;`).toEqual(['+', '*'])
-}
-
-export function test_nil (expect) {
-  const foo = lang`("foo" | nil) "bar" ${(x, y) => [x && x.value, y.value]}`
-  expect(foo`foo bar`).toEqual(['foo', 'bar'])
-  expect(foo`bar`).toEqual([null, 'bar'])
 }
