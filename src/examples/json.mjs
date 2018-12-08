@@ -5,9 +5,13 @@ const fromPairs = (pairs = []) =>
 const cons = (h, t) => [h].concat(t)
 const list = (...xs) => xs
 
+const sepBy = (expr, separator) => lang`
+  (${expr} (~${separator} ${expr})* ${cons})
+`
+
 export const json = lang`
-  Expr = ~"[" (Expr (~"," Expr)* ${cons})? "]" ${(xs = []) => xs}
-        | ~"{" (Pair (~"," Pair)* ${cons})? "}" ${fromPairs}
+  Expr = ~"[" ${sepBy(lang`Expr`, ',')}? "]" ${(xs = []) => xs}
+        | ~"{" ${sepBy(lang`Pair`, ',')}? "}" ${fromPairs}
         | %number
         | %string
         | "true"  ${() => true}

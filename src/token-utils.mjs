@@ -13,6 +13,8 @@ const mapInterpolations = value => ({
   interpolated: true,
 })
 
+export const TOKENS_MACRO = Symbol('TOKENS_MACRO')
+
 /**
  *
  * @param {Object} lexer
@@ -23,7 +25,12 @@ export function * tokenize (lexer, strs, interpolations) {
   for (const str of strs) {
     yield * lexer.reset(str)
     if (interpolations.length) {
-      yield mapInterpolations(interpolations.shift())
+      let interp = interpolations.shift()
+      if (interp[TOKENS_MACRO]) {
+        yield * interp[TOKENS_MACRO]
+      } else {
+        yield mapInterpolations(interp)
+      }
     }
   }
 }

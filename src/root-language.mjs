@@ -1,9 +1,9 @@
 import {
   parse,
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop, rightOp,
+  not, peek, nil, testValue, hasProps, maybe, ParseSubject, leftOp, drop,
 } from './parse-utils.mjs'
-import { createBasicTokenizer, tokenize } from './token-utils.mjs'
+import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
 class Quote {
   constructor (values, withContext) {
@@ -23,7 +23,7 @@ q.withContext = (...values) => new Quote(values, true)
 
 const lookup = (ctx, value) => {
   const rule = ctx.ruleMap[value]
-  if (!rule) { throw new Error(`unkown rule "${rule}"`) }
+  // if (!rule) { throw new Error(`unkown rule "${value}"`) }
   if (rule instanceof Quote) {
     ctx.ruleMap[value] = Parser.lazy(() => rule.compile(ctx))
   }
@@ -38,24 +38,20 @@ const postfix = (op, Expr, text) => seq((parser) => q(op, parser), Expr, lit(tex
 const initContext = () => ({ ruleMap: {}, literals: {} })
 const addRule = (ctx, name, rule) => ({ ...ctx, ruleMap: { ...ctx.ruleMap, [name]: rule }, ast: rule })
 
+function checkParser (parser) {
+  // force evaluation of parser (otherwise parser won't even build until its used!)
+  // this also proactively finds parse errors
+  parser.parse(new ParseSubject([], 0))
+  return parser
+}
+
 const rootParser = Parser.language({
   Program: (p) => alt(
     seq((rules) => {
       const ctx = rules.reduceRight((ctx, rule) => rule(ctx), initContext())
-      const parser = ctx.ast.compile(ctx)
-      // force evaluation of parser (otherwise parser won't even build until its used!)
-      // this also proactively finds parse errors
-      parser.parse(new ParseSubject([], 0))
-      return parser
+      return checkParser(ctx.ast.compile(ctx))
     }, repeat(p.Rule, 1)),
-    seq(
-      (expr) => {
-        const ctx = initContext()
-        const parser = expr.compile(ctx)
-        parser.ast = expr
-        return parser
-      }, p.AltExpr
-    ),
+    seq((expr) => expr.compile(initContext()), p.AltExpr),
     seq(() => end, end),
   ),
   Rule: (p) => alt(
@@ -114,10 +110,8 @@ const rootParser = Parser.language({
     seq(({ value }) => testValue(value), hasProps('test')),
     // named values
     seq(({ value }) => q.withContext(lookup, value), token('identifier')),
-    // interpolated expressions
-    seq(({ value }) => value.ast, hasProps('ast')),
     // inlined parsers
-    seq(({ value }) => value, not(hasProps('ast')), hasProps('parse'))
+    seq(({ value }) => value, hasProps('parse'))
   ),
 })
 
@@ -134,6 +128,7 @@ export function lang (strings, ...interpolations) {
     const tokens = Array.from(tokenize(childTokenizer, strings, interpolations))
     return parse(childParser, tokens)
   }
+  childTTS[TOKENS_MACRO] = tokens
   return childTTS
 }
 
@@ -209,10 +204,9 @@ export function test_interpolate_parser (expect) {
   expect(unwrap(num)`(123)`.value).toEqual(123)
 }
 
-export function skip_test_interpolate_parser_expressions (expect) {
-  const unwrap = (expr) => lang`"(" ${expr} ")"`
-  const num = lang`%number ${({ value }) => value}`
-  expect(unwrap(num)`( 123 )`).toEqual(123)
+export function test_interpolate_parser_expressions (expect) {
+  const unwrap = (expr) => lang`~"(" ${expr} ~")"`
+  expect(unwrap(lang`%number`)`(123)`).toEqual(123)
 }
 
 export function test_lookahead (expect) {
