@@ -22,5 +22,8 @@
     "eslint-plugin-standard": "^4.0.0",
     "faucet": "0.0.1",
     "rollup": "^0.67.3"
+  },
+  "dependencies": {
+    "moo": "^0.5.0"
   }
 }
