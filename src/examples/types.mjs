@@ -6,9 +6,9 @@ const t = lang`
   Expression = StringExpr
              | AddExpr
 
-  StringExpr = string ~"++" StringExpr ${(l, r) => l.value + r}
+  StringExpr = %%string ~"++" StringExpr ${(l, r) => l.value + r}
              | ~"(" StringExpr ")"
-             | string ${value}
+             | %%string ${value}
 
   AddExpr = MulExpr <% AddOp
   AddOp   = "+" ${() => (l, r) => l + r}
@@ -18,7 +18,7 @@ const t = lang`
           | "/" ${() => (l, r) => l / r}
   Expr    = ~"(" AddExpr ")"
           | ~"-" Expr  ${(value) => -value}
-          | number     ${({ value }) => value}
+          | %%number     ${({ value }) => value}
 `
 
 export function test_strings_can_concatenate (expect) {

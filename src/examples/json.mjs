@@ -7,12 +7,12 @@ const fromPairs = (pairs = []) =>
 export const json = lang`
   Expr = ~"[" (Expr % ",")? "]" ${(xs = []) => xs}
         | ~"{" (Pair % ",")? "}" ${fromPairs}
-        | number  ${value}
-        | string  ${value}
+        | %%number  ${value}
+        | %%string  ${value}
         | "true"  ${() => true}
         | "false" ${() => false}
         | "null"  ${() => null}
-  Pair = string ~":" Expr ${({ value }, expr) => [value, expr]} 
+  Pair = %%string ~":" Expr ${({ value }, expr) => [value, expr]} 
 `
 
 export function test_json (expect) {
