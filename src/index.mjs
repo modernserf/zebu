@@ -1,4 +1,4 @@
-import { lang } from './root-language'
+import { lang } from './root-language.mjs'
 
 export { lang }
 
