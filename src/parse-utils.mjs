@@ -3,25 +3,6 @@
  */
 
 /**
- * TODO: is this sufficent for packrat?
- *
- * @param {parseFn} parseFn
- * @returns {parseFn}
- */
-const memoParse = (parseFn) => {
-  const memo = new Map()
-  return (subject) => {
-    const { tokens, index } = subject
-    const tokenMemo = memo.get(tokens) || {}
-    if (!tokenMemo[index]) {
-      tokenMemo[index] = parseFn(subject)
-      memo.set(tokens, tokenMemo)
-    }
-    return tokenMemo[index]
-  }
-}
-
-/**
  * mock interface for token (see tokenizer.js)
  * @typedef {{type: string, value: any, meta: object}} Token
  */
@@ -36,19 +17,12 @@ export class ParseSubject {
     this.tokens = tokens
     this.index = index
   }
-  update (output) {
-    return new ParseSubject(this.tokens, output.index)
-  }
-  output (node, index = this.index) {
-    return new ParserOutput(node, index)
-  }
-  error (error, index = this.index) {
-    return new ParserError(error, index)
-  }
-  atIndex () {
-    return this.tokens[this.index]
-  }
 }
+
+const output = (node, index) => new ParserOutput(node, index)
+const error = (err, index) => new ParserError(err, index)
+const update = (subject, output) => new ParseSubject(subject.tokens, output.index)
+const atIndex = (subject) => subject.tokens[subject.index]
 
 export class Parser {
   /**
@@ -111,15 +85,6 @@ export function test_Parser_lazy (expect) {
   expect(parse(Expr, tokens)).toEqual(123)
 }
 
-export class MemoParser extends Parser {
-  /**
-   * @param {parseFn} parseFn
-   */
-  constructor (parseFn) {
-    super(memoParse(parseFn))
-  }
-}
-
 export class ParserOutput {
   /**
    * @param {any} node
@@ -143,7 +108,7 @@ export class ParserError {
 /**
  * consumes no input, always succeeds
  */
-export const nil = new Parser(({ index }) => new ParserOutput(null, index))
+export const nil = new Parser(({ index }) => output(null, index))
 
 export function test_nil_matches_an_empty_sequence (expect) {
   expect(parse(nil, [])).toEqual(null)
@@ -156,25 +121,25 @@ export function test_nil_matches_an_empty_sequence (expect) {
  * matches the start of input.
  */
 export const start = new Parser((subject) =>
-  subject.index === 0 ? subject.output(null) : subject.error('not at start'))
+  subject.index === 0 ? output(null, 0) : error('not at start', subject.index))
 
 /**
  * matches the end of input.
  */
 export const end = new Parser((subject) =>
-  subject.index === subject.tokens.length ? subject.output(null) : subject.error('not at end'))
+  subject.index === subject.tokens.length ? output(null, subject.index) : error('not at end', subject.index))
 
 /**
  * matches if matchFn(token) returns true.
  * @param {(t: Token) => boolean} matchFn
  * @param {any} error
  */
-export const matchToken = (matchFn, error = 'did not match') => new Parser((subject) => {
-  const token = subject.atIndex()
-  if (!token) { return subject.error('unexpected end of input') }
+export const matchToken = (matchFn, err = 'did not match') => new Parser((subject) => {
+  const token = atIndex(subject)
+  if (!token) { return error('unexpected end of input', subject.index) }
   return matchFn(token)
-    ? subject.output(subject.atIndex(), subject.index + 1)
-    : subject.error(error)
+    ? output(atIndex(subject), subject.index + 1)
+    : error(err, subject.index)
 })
 
 /**
@@ -240,7 +205,7 @@ const DROP = Symbol('DROP')
  * @param {(...t : any[]) => any} mapFn
  * @param  {...Parser} parsers
  */
-export const seq = (mapFn, ...parsers) => new MemoParser((subject) => {
+export const seq = (mapFn, ...parsers) => new Parser((subject) => {
   const out = []
   for (const p of parsers) {
     if (!p.parse) { console.warn('not a parser:', p, subject) }
@@ -249,16 +214,16 @@ export const seq = (mapFn, ...parsers) => new MemoParser((subject) => {
     if (res.node !== DROP) {
       out.push(res.node)
     }
-    subject = subject.update(res)
+    subject = update(subject, res)
   }
-  return subject.output(quote(mapFn, out))
+  return output(quote(mapFn, out), subject.index)
 })
 
-export const drop = (parser) => new MemoParser((subject) => {
+export const drop = (parser) => new Parser((subject) => {
   const res = parser.parse(subject)
   if (!res.ok) { return res }
-  subject = subject.update(res)
-  return subject.output(DROP)
+  subject = update(subject, res)
+  return output(DROP, subject.index)
 })
 
 export function test_seq_matches_a_sequence (expect) {
@@ -276,14 +241,14 @@ export function test_seq_matches_a_sequence (expect) {
  * outputs the output of the first parser that matches.
  * @param  {...Parser} parsers
  */
-export const alt = (...parsers) => new MemoParser((subject) => {
+export const alt = (...parsers) => new Parser((subject) => {
   let errors = []
   for (const p of parsers) {
     const res = p.parse(subject)
     if (res.ok) { return res }
     errors.push(res.error)
   }
-  return subject.error(['alts failed:', errors])
+  return error(['alts failed:', errors], subject.index)
 })
 
 export function test_alt_matches_one_of_options (expect) {
@@ -300,18 +265,18 @@ export function test_alt_matches_one_of_options (expect) {
  * @param {number} min minimum number of matches required
  * @param {number} max maximum number of matches before giving up
  */
-export const repeat = (parser, min = 0, max = Infinity) => new MemoParser((subject) => {
+export const repeat = (parser, min = 0, max = Infinity) => new Parser((subject) => {
   const out = []
   while (subject.index < subject.tokens.length && out.length < max) {
     const res = parser.parse(subject)
     if (!res.ok) { break }
     out.push(res.node)
-    subject = subject.update(res)
+    subject = update(subject, res)
   }
   if (out.length < min) {
-    return subject.error(['not enough items', parser, min])
+    return error(['not enough items', parser, min], subject.index)
   }
-  return subject.output(quote((...xs) => xs, out))
+  return output(quote((...xs) => xs, out), subject.index)
 })
 
 export function test_repeat (expect) {
@@ -410,8 +375,8 @@ export function test_rightOp (expect) {
  */
 export const not = (parser) => new Parser((subject) =>
   parser.parse(subject).ok
-    ? subject.error(['unexpected', parser])
-    : subject.output(DROP))
+    ? error(['unexpected', parser], subject.index)
+    : output(DROP, subject.index))
 
 /**
  * match if the parser succeeds, but do not consume input.
@@ -419,8 +384,8 @@ export const not = (parser) => new Parser((subject) =>
  */
 export const peek = (parser) => new Parser((subject) =>
   parser.parse(subject).ok
-    ? subject.output(DROP)
-    : subject.error(['expected', parser]))
+    ? output(DROP, subject.index)
+    : error(['expected', parser], subject.index))
 
 /**
  * Parse a stream of tokens, and return the output.
