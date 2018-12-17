@@ -149,31 +149,26 @@ export const machine = lang`
                 | ~"start" ~"=" TagExpr ${(value) => ['start', value]}
     Rule = OrEvent ~"->" OrEffect ${(event, effect) => ['rule', { event, effect }]}
            # ({ State, Scope }) => Maybe State
-           # test if the current state matches TagBind,
-           # if so, run each rule with the state first as normal,
-           # then as transformed to TagExpr
          | TagExpr ~"extends" TagBind
            ${(dest, src) => ['extends', (state) => fmap(dest, src({}, state))]}
 
     # events are ({ State, Action, Scope }) => Maybe Scope
+    # TODO: events as [stateType, actionType, ({state, action, scope}) => Maybe Scope]
+    #       for indexing / type checking
     OrEvent   = CondEvent (~"|" CondEvent)* 
                 ${(h, t) => (params) => firstM([h, ...t].map(params))}
-    CondEvent = State ~"@" Event (~"if" StateCond)?
+    CondEvent = ~"(" OrEvent ")"
+              | State ~"@" Event (~"if" EventCond)?
                 ${(s, e, c = okEvent) => (params) => foldEvents(params, [s, e, c])}
-              | ~"(" OrEvent ")"
 
-    OrState   = AndState (~"|" AndState)*
-                ${(h, t) => (params) => firstM([h, ...t].map((f) => f(params)))}
-    AndState  = (State | StateCond) ("&" StateCond)*
-                ${(h, t) => (params) => foldEvents(params, [h, ...t])}
-    StateCond = Cond ${(cond) => ({ scope }) => cond(scope) ? ok(scope) : none}
-    State     = ~"(" OrState ")"
-              | TagBind ${(f) => ({ state, scope }) => f(scope, state)}
+    State     = TagBind ${(f) => ({ state, scope }) => f(scope, state)}
 
     Event     = TagBind ${(f) => ({ action, scope }) => f(scope, action)}
                 # TODO: set up subscriptions on here?
               | "after" %number ("s" | "ms")
               | ("enter" | "exit") (State | Cond)
+
+    EventCond = Cond ${(cond) => ({ scope }) => cond(scope) ? ok(scope) : none}
 
     # cond are (scope) => bool
     OrCond    = AndCond (~"|" AndCond)*
@@ -189,7 +184,9 @@ export const machine = lang`
               | "in" | "not" "in" ${() => 'not_in'} 
               | "is" | "is" "not" ${() => 'is_not'}
     
-    # effects are (scope) => Maybe [nextState, (store) => {}]
+    # effects are (scope) => Maybe [nextState?, (store) => {}]
+    # TODO: [stateType?, [actionTypes], (scope) => Maybe [nextState?, (store) => {}]]
+    #       for indexing / type checikng
     OrEffect    = CondEffect (~"|" CondEffect)*
                   ${(h, t) => (scope) => firstM([h, ...t].map((f) => f(scope)))}
     CondEffect  = AndEffect ~"if" Cond 
