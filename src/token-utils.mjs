@@ -1,18 +1,5 @@
 import moo from 'moo'
 
-function smartTypeOf (value) {
-  if (typeof value === 'object' && !value) {
-    return 'null'
-  }
-  return typeof value
-}
-
-const mapInterpolations = value => ({
-  type: smartTypeOf(value),
-  value,
-  interpolated: true,
-})
-
 export const TOKENS_MACRO = Symbol('TOKENS_MACRO')
 
 /**
