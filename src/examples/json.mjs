@@ -4,8 +4,8 @@ const fromPairs = (pairs = []) =>
   pairs.reduce((obj, [key, value]) => Object.assign(obj, { [key]: value }), {})
 
 export const json = lang`
-  Expr = ~"[" ${sepBy(lang`Expr`, ',')}? "]" ${(xs = []) => xs}
-        | ~"{" ${sepBy(lang`Pair`, ',')}? "}" ${fromPairs}
+  Expr = ~"[" \ ${sepBy(lang`Expr`, ',')}? "]" ${(xs = []) => xs}
+        | ~"{" \ ${sepBy(lang`Pair`, ',')}? "}" ${fromPairs}
         | %number
         | %string
         | "true"  ${() => true}

@@ -198,6 +198,8 @@ const QUOTE = Symbol('QUOTE')
 const quote = (fn, values) => ({ [QUOTE]: () => unquote(fn)(...values.map(unquote)) })
 const unquote = (x) => x && x[QUOTE] ? x[QUOTE]() : x
 
+export const CUT = Symbol('CUT')
+
 const DROP = Symbol('DROP')
 /**
  * matches if each in a sequence of parsers matches.
@@ -207,10 +209,18 @@ const DROP = Symbol('DROP')
  */
 export const seq = (mapFn, ...parsers) => new Parser((subject) => {
   const out = []
+  let didCut = false
   for (const p of parsers) {
+    if (p === CUT) {
+      didCut = true
+      continue
+    }
     if (!p.parse) { console.warn('not a parser:', p, subject) }
     const res = p.parse(subject)
-    if (!res.ok) { return res }
+    if (!res.ok) {
+      if (didCut) { throw new Error(res.error) }
+      return res
+    }
     if (res.node !== DROP) {
       out.push(res.node)
     }

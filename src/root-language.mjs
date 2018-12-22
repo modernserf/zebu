@@ -1,7 +1,7 @@
 import {
   parse,
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  not, peek, hasProps, maybe, ParseSubject, drop,
+  not, peek, hasProps, maybe, ParseSubject, drop, CUT,
 } from './parse-utils.mjs'
 import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
@@ -86,6 +86,8 @@ const rootParser = Parser.language({
     seq(({ value }) => seq(({ value }) => value, token(value)), drop(lit('%')), token('identifier')),
     // "foo"
     seq(({ value }) => lit(value), token('string')),
+    // cut
+    seq(() => CUT, lit('\\')),
     // named values
     seq(({ value }) => q.withContext(lookup, value), token('identifier')),
     // inlined parsers
@@ -94,7 +96,7 @@ const rootParser = Parser.language({
 })
 
 // for root language
-const literals = ['nil', '=', '|', '(', ')', '{', '}', '*', '+', '?', '%', '&', '!', '~', ',']
+const literals = ['nil', '=', '|', '(', ')', '{', '}', '*', '+', '?', '%', '&', '!', '~', ',', '\\']
 const rootTokenizer = createBasicTokenizer(literals)
 
 export function lang (strings, ...interpolations) {
