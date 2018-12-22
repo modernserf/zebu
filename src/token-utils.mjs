@@ -29,7 +29,7 @@ export function * tokenize (lexer, strs, interpolations) {
       if (interp[TOKENS_MACRO]) {
         yield * interp[TOKENS_MACRO]
       } else {
-        yield mapInterpolations(interp)
+        yield { type: 'interpolation', interpolated: true, value: interp }
       }
     }
   }

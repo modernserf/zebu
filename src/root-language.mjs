@@ -1,7 +1,7 @@
 import {
   parse,
   Parser, seq, repeat, alt, end, token, lit, sepBy,
-  not, peek, hasProps, maybe, ParseSubject, drop,
+  not, peek, maybe, ParseSubject, drop,
 } from './parse-utils.mjs'
 import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
@@ -65,10 +65,20 @@ const rootParser = Parser.language({
     (alts) => q(alt, ...alts),
     sepBy(p.SeqExpr, lit('|'))
   ),
-  SeqExpr: (p) => seq(
-    (exprs, mapFn = { value: id }) => q(seq, mapFn.value, ...exprs),
-    repeat(seq(id, not(p.RuleHead), p.RepExpr), 1),
-    maybe(token('function'))
+  SeqExpr: (p) => alt(
+    seq(
+      (xs) => {
+        const most = xs.slice(0, -1)
+        const last = xs[xs.length - 1]
+        if (last && typeof last === 'function') {
+          return q(seq, last, ...most)
+        } else {
+          return q(seq, id, ...xs)
+        }
+      },
+      repeat(seq(id, not(p.RuleHead), p.RepExpr), 2),
+    ),
+    p.RepExpr
   ),
   RepExpr: (p) => alt(
     postfix((x) => repeat(x, 0), p.Expr, '*'),
@@ -88,8 +98,8 @@ const rootParser = Parser.language({
     seq(({ value }) => lit(value), token('string')),
     // named values
     seq(({ value }) => q.withContext(lookup, value), token('identifier')),
-    // inlined parsers
-    seq(({ value }) => value, hasProps('parse'))
+    // interpolated values
+    seq(({ value }) => typeof value === 'string' ? lit(value) : value, token('interpolation'))
   ),
 })
 
@@ -100,7 +110,9 @@ const rootTokenizer = createBasicTokenizer(literals)
 export function lang (strings, ...interpolations) {
   const tokens = Array.from(tokenize(rootTokenizer, strings, interpolations))
   const childParser = parse(rootParser.Program, tokens)
-  const childLiterals = tokens.filter((t) => t.type === 'string').map((t) => t.value)
+  const childLiterals = tokens
+    .filter((t) => t.type === 'string' || (t.type === 'interpolation' && typeof t.value === 'string'))
+    .map((t) => t.value)
   const childTokenizer = createBasicTokenizer(childLiterals)
   const childTTS = (strings, ...interpolations) => {
     const tokens = Array.from(tokenize(childTokenizer, strings, interpolations))
