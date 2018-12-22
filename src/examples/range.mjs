@@ -32,14 +32,14 @@ export const range = lang`
             | Range
 
   Range = Start ~"..." End ${doRange}
-        | Value % ","
+        | Value (~"," Value)* ${(h, t) => [h, ...t]}
 
   Start = ExcludeValue ~"," Value ${interval(true)}
         | Value ~"," Value ${interval(false)}
         | Value ${(value) => ({ value, exclude: false })} 
   End   = ExcludeValue ${(value) => ({ value, exclude: true })}
-        | number
+        | %number ${(value) => ({ value, exclude: false })}
 
   ExcludeValue = ~"(" Value ")"
-  Value        = number ${({ value }) => value}
+  Value        = %number
 `
