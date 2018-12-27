@@ -334,6 +334,28 @@ export function test_sepBy (expect) {
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
 
+export const wrappedWith = (left, content, right) => alt(
+  seq((x) => x, drop(left), content, CUT, drop(right)),
+  seq((x) => x, peek(right), CUT, not(right)),
+)
+
+export function test_wrappedWith (expect) {
+  const tokens = [
+    $t('token', '('),
+    $t('identifier', 'foo'),
+    $t('token', ')'),
+  ]
+  const parser = seq(
+    ({ value }) => value,
+    wrappedWith(
+      lit('('),
+      token('identifier'),
+      lit(')')
+    )
+  )
+  expect(parse(parser, tokens)).toEqual('foo')
+}
+
 /**
  * match if the parser fails; fail if it matches. Consumes no input.
  * @param {Parser} parser
