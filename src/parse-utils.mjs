@@ -118,12 +118,6 @@ export function test_nil_matches_an_empty_sequence (expect) {
 }
 
 /**
- * matches the start of input.
- */
-export const start = new Parser((subject) =>
-  subject.index === 0 ? output(null, 0) : error('not at start', subject.index))
-
-/**
  * matches the end of input.
  */
 export const end = new Parser((subject) =>
@@ -336,7 +330,7 @@ export function test_sepBy (expect) {
 
 export const wrappedWith = (left, content, right) => alt(
   seq((x) => x, drop(left), content, CUT, drop(right)),
-  seq((x) => x, peek(right), CUT, not(right)),
+  // seq((x) => x, peek(right), CUT, not(right)),
 )
 
 export function test_wrappedWith (expect) {
@@ -375,11 +369,17 @@ export const peek = (parser) => new Parser((subject) =>
     : error(['expected', parser], subject.index))
 
 // A = A B | C -> A = C B*
+const list = (...xs) => xs
 export const left = (mapFn, baseCase, ...iterCases) =>
   seq(
     (base, iters) => iters.reduce((acc, xs) => mapFn(acc, ...xs), base),
-    baseCase, repeat(seq((...xs) => xs, ...iterCases))
+    baseCase, repeat(seq(list, ...iterCases))
   )
+
+export const right = (getParser) => {
+  const p = Parser.lazy(() => getParser(p))
+  return p
+}
 
 export function test_left_recursion (expect) {
   const tokens = [
@@ -409,7 +409,9 @@ export function parse (parser, tokens) {
     throw new Error(res.error)
   }
   if (res.index !== tokens.length) {
-    throw new Error('Leftover tokens')
+    throw new LeftoverTokensError(tokens.slice(res.index))
   }
   return unquote(res.node)
 }
+
+class LeftoverTokensError extends Error {}

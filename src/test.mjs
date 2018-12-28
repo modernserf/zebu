@@ -2,11 +2,12 @@ import assert from 'assert'
 import * as parseUtils from './parse-utils'
 import * as tokenUtils from './token-utils'
 import * as rootLanguage from './root-language'
+import * as visiblyPushdown from './visibly-pushdown'
 import * as jsonExample from './examples/json'
 import * as typeExample from './examples/types'
 
 const modules = [
-  parseUtils, tokenUtils, rootLanguage,
+  parseUtils, tokenUtils, rootLanguage, visiblyPushdown,
   jsonExample, typeExample,
 ]
 
