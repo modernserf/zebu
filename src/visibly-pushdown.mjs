@@ -3,6 +3,7 @@ import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
+class ScopeNotDefinedError extends Error {}
 
 const id = (x) => x
 const list = (...xs) => xs
@@ -124,7 +125,7 @@ const compiler = createCompiler({
     ? alt(ctx.eval(h), ...t.map(ctx.eval))
     : ctx.eval(h),
   seq: (exprs, fn = id, ctx) => seq(fn, ...exprs.map(ctx.eval)),
-  sepBy: (expr, sep, ctx) => sepBy(ctx.eval(expr), ctx.eval(sep)),
+  sepBy: (expr, sep, ctx) => maybe(sepBy(ctx.eval(expr), ctx.eval(sep))),
   peek: (expr, ctx) => peek(ctx.eval(expr)),
   not: (expr, ctx) => not(ctx.eval(expr)),
   drop: (expr, ctx) => drop(ctx.eval(expr)),
@@ -138,9 +139,11 @@ const compiler = createCompiler({
       ctx.eval(end)
     ),
   identifier: (name, ctx) => {
-    if (!ctx.scope) { throw new UnknownRuleError(name) }
+    if (!ctx.scope) { throw new ScopeNotDefinedError(name) }
     const rule = ctx.scope[name]
-    if (!rule) { throw new UnknownRuleError(name) }
+    if (!rule) {
+      throw new UnknownRuleError(name)
+    }
     return rule
   },
   token: (type) => token(type),
@@ -148,14 +151,16 @@ const compiler = createCompiler({
 })
 
 function createCompiler (model) {
-  const ctx = {
-    eval: ([type, ...payload]) =>
-      model[type](...payload, ctx),
-    evalWith: (...extra) =>
-      ([type, ...payload]) =>
-        model[type](...payload, ctx, ...extra),
+  return (ast) => {
+    const ctx = {
+      eval: ([type, ...payload]) =>
+        model[type](...payload, ctx),
+      evalWith: (...extra) =>
+        ([type, ...payload]) =>
+          model[type](...payload, ctx, ...extra),
+    }
+    return ctx.eval(ast)
   }
-  return ctx.eval
 }
 
 const literals = [
@@ -237,4 +242,16 @@ export function test_lang_operator_precedence_assoc (expect) {
   expect(math`3/ (4 / 5)`).toEqual(3 / (4 / 5))
   expect(math`1 + 2 * 3 - 4`).toEqual(1 + (2 * 3) - 4)
   expect(math`2 ** 3 ** 2`).toEqual(2 ** (3 ** 2))
+}
+
+export function test_lookahead (expect) {
+  const optionalSemis = lang`(!";" ("+" | "*") ${(x) => x.value})+ ";"? ${(xs) => xs}`
+  expect(optionalSemis`+ *`).toEqual(['+', '*'])
+  expect(optionalSemis`+ * ;`).toEqual(['+', '*'])
+}
+
+export function test_lang_maybe (expect) {
+  const trailingCommas = lang`%number ~"," %number ","? ${(a, b) => [a, b]}`
+  expect(trailingCommas`1, 2`).toEqual([1, 2])
+  expect(trailingCommas`1, 2,`).toEqual([1, 2])
 }

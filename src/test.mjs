@@ -46,7 +46,7 @@ async function runTests (modules) {
       console.log('ok', count)
       passCount++
     } catch (e) {
-      console.log('not ok', count, e.message)
+      console.log('not ok', count, e.constructor.name, e.message)
     }
   }
 

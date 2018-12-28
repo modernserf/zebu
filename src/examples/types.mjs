@@ -1,17 +1,23 @@
-import { lang, leftOp } from '../index'
+import { lang } from '../index'
 
 const t = lang`
-  Expression = StringExpr
-             | AddExpr
+  Expr    = CatExpr
+          | AddExpr
 
-  StringExpr = %string ~"++" StringExpr ${(l, r) => l + r}
-             | ~"(" StringExpr ")"
-             | %string
+  CatExpr = < . ~"++" StrExpr > ${(l, r) => l + r}
+          | StrExpr
+  StrExpr = ["(" CatExpr ")"]
+          | %string
 
-  AddExpr = ${leftOp(lang`MulExpr`, { '+': (l, r) => l + r, '-': (l, r) => l - r })}
-  MulExpr = ${leftOp(lang`Expr`, { '*': (l, r) => l * r, '/': (l, r) => l / r })}
-  Expr    = ~"(" AddExpr ")"
-          | ~"-" Expr  ${(value) => -value}
+  AddExpr = < . ~"+" MulExpr >  ${(l, r) => l + r}
+          | < . ~"-" MulExpr >  ${(l, r) => l - r}
+          | MulExpr
+  MulExpr = < . ~"*" NegExpr >  ${(l, r) => l * r}
+          | < . ~"/" NegExpr >  ${(l, r) => l / r}
+          | NegExpr
+  NegExpr = ~"-" NumExpr        ${(value) => -value}
+          | NumExpr
+  NumExpr = ["(" AddExpr ")"]
           | %number
 `
 
