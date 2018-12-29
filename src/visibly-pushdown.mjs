@@ -1,4 +1,4 @@
-import { end, alt, seq, repeat, token as tok, lit, drop, not, maybe, wrappedWith, peek, sepBy, left, right, Parser, parse } from './parse-utils.mjs'
+import { end, alt, seq, repeat, token as tok, lit, drop, not, maybe, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
 import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -14,7 +14,6 @@ const token = (type) => seq(valueOf, tok(type))
 const tag = (type) => (...values) => [type, ...values]
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
-const lazyWrapped = (l, getContent, r) => wrappedWith(l, Parser.lazy(getContent), r)
 
 const terminal = alt(
   seq(tag('token'), dlit('%'), token('identifier')),
@@ -22,8 +21,8 @@ const terminal = alt(
 )
 const ruleHead = seqi(token('identifier'), dlit('='))
 const baseExpr = alt(
-  lazyWrapped(lit('('), () => expr, lit(')')),
-  seq(tag('wrapped'), lazyWrapped(
+  wrappedWith(lit('('), () => expr, lit(')')),
+  seq(tag('wrapped'), wrappedWith(
     lit('['), () => seq(list, terminal, sepExpr, terminal), lit(']')
   )),
   seq(tag('identifier'), token('identifier')),
@@ -129,7 +128,7 @@ const compiler = createCompiler({
   wrapped: ([start, content, end], ctx) =>
     wrappedWith(
       ctx.eval(start),
-      Parser.lazy(() => ctx.eval(content)),
+      () => ctx.eval(content),
       ctx.eval(end)
     ),
   identifier: (name, ctx) => {

@@ -307,8 +307,8 @@ export function test_sepBy (expect) {
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
 
-export const wrappedWith = (left, content, right) => alt(
-  seq((x) => x, drop(left), content, CUT, drop(right)),
+export const wrappedWith = (left, getContent, right) => alt(
+  seq((x) => x, drop(left), Parser.lazy(getContent), CUT, drop(right)),
   // seq((x) => x, peek(right), CUT, not(right)),
 )
 
@@ -322,7 +322,7 @@ export function test_wrappedWith (expect) {
     ({ value }) => value,
     wrappedWith(
       lit('('),
-      token('identifier'),
+      () => token('identifier'),
       lit(')')
     )
   )
