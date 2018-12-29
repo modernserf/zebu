@@ -1,8 +1,4 @@
 /**
- * @typedef {(p: ParseSubject) => ParserOutput | ParserError} parseFn
- */
-
-/**
  * mock interface for token (see tokenizer.js)
  * @typedef {{type: string, value: any, meta: object}} Token
  */
@@ -17,51 +13,6 @@ class ParseSubject {
     this.tokens = tokens
     this.index = index
   }
-}
-
-const output = (node, index) => new ParserOutput(node, index)
-const error = (err, index) => new ParserError(err, index)
-const update = (subject, output) => new ParseSubject(subject.tokens, output.index)
-const atIndex = (subject) => subject.tokens[subject.index]
-
-class Parser {
-  /**
-   * make a parser that evaluates lazily (e.g. for recursive definitions).
-   * @param {() => parseFn} parserThunk
-   */
-  static lazy (parserThunk) {
-    let memo
-    return new Parser((subject) => {
-      if (!memo) { memo = parserThunk() }
-      return memo.parse(subject)
-    })
-  }
-  /**
-   * @param {parseFn} parseFn
-   */
-  constructor (parseFn) {
-    this.parse = parseFn
-  }
-}
-
-export function test_Parser_lazy (expect) {
-  const Expr = Parser.lazy(() =>
-    alt(
-      seq((_, x) => x, lit('('), Expr, lit(')')),
-      seq((_, x) => -x, lit('-'), Expr),
-      seq(({ value }) => value, token('number'))
-    ))
-  // -(-(123))
-  const tokens = [
-    $t('token', '-'),
-    $t('token', '('),
-    $t('token', '-'),
-    $t('token', '('),
-    $t('number', 123),
-    $t('token', ')'),
-    $t('token', ')'),
-  ]
-  expect(parse(Expr, tokens)).toEqual(123)
 }
 
 class ParserOutput {
@@ -84,10 +35,46 @@ class ParserError {
   }
 }
 
+const output = (node, index) => new ParserOutput(node, index)
+const error = (err, index) => new ParserError(err, index)
+const update = (subject, output) => new ParseSubject(subject.tokens, output.index)
+const atIndex = (subject) => subject.tokens[subject.index]
+
+class LazyParser {
+  constructor (thunk) {
+    this.thunk = thunk
+    this.memo = null
+  }
+  parse (subject) {
+    if (!this.memo) { this.memo = this.thunk() }
+    return this.memo.parse(subject)
+  }
+}
+
+export function test_LazyParser (expect) {
+  const Expr = new LazyParser(() =>
+    alt(
+      seq((_, x) => x, lit('('), Expr, lit(')')),
+      seq((_, x) => -x, lit('-'), Expr),
+      seq(({ value }) => value, token('number'))
+    ))
+  // -(-(123))
+  const tokens = [
+    $t('token', '-'),
+    $t('token', '('),
+    $t('token', '-'),
+    $t('token', '('),
+    $t('number', 123),
+    $t('token', ')'),
+    $t('token', ')'),
+  ]
+  expect(parse(Expr, tokens)).toEqual(123)
+}
+
 /**
  * consumes no input, always succeeds
  */
-export const nil = new Parser(({ index }) => output(null, index))
+export const nil = { parse: ({ index }) => output(null, index) }
 
 export function test_nil_matches_an_empty_sequence (expect) {
   expect(parse(nil, [])).toEqual(null)
@@ -96,18 +83,26 @@ export function test_nil_matches_an_empty_sequence (expect) {
   }).toThrow()
 }
 
+class MatchParser {
+  constructor (matchFn, err) {
+    this.matchFn = matchFn
+    this.err = err
+  }
+  parse (subject) {
+    const token = atIndex(subject)
+    if (!token) { return error('unexpected end of input', subject.index) }
+    return this.matchFn(token)
+      ? output(atIndex(subject), subject.index + 1)
+      : error(this.err, subject.index)
+  }
+}
+
 /**
  * matches if matchFn(token) returns true.
  * @param {(t: Token) => boolean} matchFn
  * @param {any} error
  */
-export const matchToken = (matchFn, err = 'did not match') => new Parser((subject) => {
-  const token = atIndex(subject)
-  if (!token) { return error('unexpected end of input', subject.index) }
-  return matchFn(token)
-    ? output(atIndex(subject), subject.index + 1)
-    : error(err, subject.index)
-})
+export const matchToken = (matchFn, err = 'did not match') => new MatchParser(matchFn, err)
 
 /**
  * matches if token.type === type.
@@ -168,40 +163,55 @@ const unquote = (x) => x && x[QUOTE] ? x[QUOTE]() : x
 export const CUT = Symbol('CUT')
 
 const DROP = Symbol('DROP')
+class SeqParser {
+  constructor (mapFn, parsers) {
+    this.mapFn = mapFn
+    this.parsers = parsers
+  }
+  parse (subject) {
+    const out = []
+    let didCut = false
+    for (const p of this.parsers) {
+      if (p === CUT) {
+        didCut = true
+        continue
+      }
+      if (!p.parse) { console.warn('not a parser:', p, subject) }
+      const res = p.parse(subject)
+      if (!res.ok) {
+        if (didCut) { throw new Error(res.error) }
+        return res
+      }
+      if (res.node !== DROP) {
+        out.push(res.node)
+      }
+      subject = update(subject, res)
+    }
+    return output(quote(this.mapFn, out), subject.index)
+  }
+}
+
 /**
  * matches if each in a sequence of parsers matches.
  * outputs mapFn(subject, ...outputs).
  * @param {(...t : any[]) => any} mapFn
  * @param  {...Parser} parsers
  */
-export const seq = (mapFn, ...parsers) => new Parser((subject) => {
-  const out = []
-  let didCut = false
-  for (const p of parsers) {
-    if (p === CUT) {
-      didCut = true
-      continue
-    }
-    if (!p.parse) { console.warn('not a parser:', p, subject) }
-    const res = p.parse(subject)
-    if (!res.ok) {
-      if (didCut) { throw new Error(res.error) }
-      return res
-    }
-    if (res.node !== DROP) {
-      out.push(res.node)
-    }
-    subject = update(subject, res)
-  }
-  return output(quote(mapFn, out), subject.index)
-})
+export const seq = (mapFn, ...parsers) => new SeqParser(mapFn, parsers)
 
-export const drop = (parser) => new Parser((subject) => {
-  const res = parser.parse(subject)
-  if (!res.ok) { return res }
-  subject = update(subject, res)
-  return output(DROP, subject.index)
-})
+class DropParser {
+  constructor (parser) {
+    this._droppedParser = parser
+  }
+  parse (subject) {
+    const res = this._droppedParser.parse(subject)
+    if (!res.ok) { return res }
+    subject = update(subject, res)
+    return output(DROP, subject.index)
+  }
+}
+
+export const drop = (parser) => new DropParser(parser)
 
 export function test_seq_matches_a_sequence (expect) {
   const parser = seq((_, value) => value, lit('('), token('foo'), lit(')'))
@@ -213,25 +223,53 @@ export function test_seq_matches_a_sequence (expect) {
   expect(parse(parser, tokens)).toEqual($t('foo'))
 }
 
+class AltParser {
+  constructor (parsers) {
+    this.parsers = parsers
+  }
+  parse (subject) {
+    let errors = []
+    for (const p of this.parsers) {
+      const res = p.parse(subject)
+      if (res.ok) { return res }
+      errors.push(res.error)
+    }
+    return error(['alts failed:', errors], subject.index)
+  }
+}
+
 /**
  * matches if any of the parsers match.
  * outputs the output of the first parser that matches.
  * @param  {...Parser} parsers
  */
-export const alt = (...parsers) => new Parser((subject) => {
-  let errors = []
-  for (const p of parsers) {
-    const res = p.parse(subject)
-    if (res.ok) { return res }
-    errors.push(res.error)
-  }
-  return error(['alts failed:', errors], subject.index)
-})
+export const alt = (...parsers) => new AltParser(parsers)
 
 export function test_alt_matches_one_of_options (expect) {
   const parser = alt(token('foo'), token('bar'))
   expect(parse(parser, [$t('foo')])).toEqual($t('foo'))
   expect(parse(parser, [$t('bar')])).toEqual($t('bar'))
+}
+
+class RepeatParser {
+  constructor (parser, min, max) {
+    this.parser = parser
+    this.min = min
+    this.max = max
+  }
+  parse (subject) {
+    const out = []
+    while (subject.index < subject.tokens.length && out.length < this.max) {
+      const res = this.parser.parse(subject)
+      if (!res.ok) { break }
+      out.push(res.node)
+      subject = update(subject, res)
+    }
+    if (out.length < this.min) {
+      return error(['not enough items', this.parser, this.min], subject.index)
+    }
+    return output(quote((...xs) => xs, out), subject.index)
+  }
 }
 
 /**
@@ -242,19 +280,7 @@ export function test_alt_matches_one_of_options (expect) {
  * @param {number} min minimum number of matches required
  * @param {number} max maximum number of matches before giving up
  */
-export const repeat = (parser, min = 0, max = Infinity) => new Parser((subject) => {
-  const out = []
-  while (subject.index < subject.tokens.length && out.length < max) {
-    const res = parser.parse(subject)
-    if (!res.ok) { break }
-    out.push(res.node)
-    subject = update(subject, res)
-  }
-  if (out.length < min) {
-    return error(['not enough items', parser, min], subject.index)
-  }
-  return output(quote((...xs) => xs, out), subject.index)
-})
+export const repeat = (parser, min = 0, max = Infinity) => new RepeatParser(parser, min, max)
 
 export function test_repeat (expect) {
   const tokens = [
@@ -302,7 +328,7 @@ export function test_sepBy (expect) {
 }
 
 export const wrappedWith = (left, getContent, right) => alt(
-  seq((x) => x, drop(left), Parser.lazy(getContent), CUT, drop(right)),
+  seq((x) => x, drop(left), new LazyParser(getContent), CUT, drop(right)),
   // seq((x) => x, peek(right), CUT, not(right)),
 )
 
@@ -323,23 +349,38 @@ export function test_wrappedWith (expect) {
   expect(parse(parser, tokens)).toEqual('foo')
 }
 
+class NotParser {
+  constructor (parser) {
+    this.parser = parser
+  }
+  parse (subject) {
+    return this.parser.parse(subject).ok
+      ? error(['unexpected', this.parser], subject.index)
+      : output(DROP, subject.index)
+  }
+}
 /**
  * match if the parser fails; fail if it matches. Consumes no input.
  * @param {Parser} parser
  */
-export const not = (parser) => new Parser((subject) =>
-  parser.parse(subject).ok
-    ? error(['unexpected', parser], subject.index)
-    : output(DROP, subject.index))
+export const not = (parser) => new NotParser(parser)
+
+class PeekParser {
+  constructor (parser) {
+    this.parser = parser
+  }
+  parse (subject) {
+    return this.parser.parse(subject).ok
+      ? output(DROP, subject.index)
+      : error(['expected', this.parser], subject.index)
+  }
+}
 
 /**
  * match if the parser succeeds, but do not consume input.
  * @param {Parser} parser
  */
-export const peek = (parser) => new Parser((subject) =>
-  parser.parse(subject).ok
-    ? output(DROP, subject.index)
-    : error(['expected', parser], subject.index))
+export const peek = (parser) => new PeekParser(parser)
 
 // A = A B | C -> A = C B*
 const list = (...xs) => xs
@@ -350,7 +391,7 @@ export const left = (mapFn, baseCase, ...iterCases) =>
   )
 
 export const right = (getParser) => {
-  const p = Parser.lazy(() => getParser(p))
+  const p = new LazyParser(() => getParser(p))
   return p
 }
 
