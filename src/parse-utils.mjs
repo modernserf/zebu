@@ -36,27 +36,6 @@ export class Parser {
       return memo.parse(subject)
     })
   }
-
-  /**
-   * Make a dictionary of mutually recurisve parsers. Example:
-   ```js
-    Parser.language({
-      Expr: r => alt(
-        seq((_, x) => x, lit("("), r.Expr, lit(")")),
-        token("number")
-      )
-    })```
-   * @param {{[x: string]: (o: {}) => Parser}} inMap
-   * @returns {{[x: string]: Parser}}
-   */
-  static language (inMap) {
-    let outMap = {}
-    for (const key in inMap) {
-      outMap[key] = Parser.lazy(() => inMap[key](outMap))
-      outMap[key]._name = key
-    }
-    return outMap
-  }
   /**
    * @param {parseFn} parseFn
    */

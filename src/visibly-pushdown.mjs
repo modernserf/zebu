@@ -14,73 +14,67 @@ const token = (type) => seq(valueOf, tok(type))
 const tag = (type) => (...values) => [type, ...values]
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
+const lazyWrapped = (l, getContent, r) => wrappedWith(l, Parser.lazy(getContent), r)
 
-const rootParser = Parser.language({
-  Program: (p) => seq(
-    compiler,
-    alt(
-      seq(tag('program'), repeat(p.Rule, 1)),
-      p.Expr,
-      seq(tag('nil'), end),
-    ),
+const terminal = alt(
+  seq(tag('token'), dlit('%'), token('identifier')),
+  seq(tag('literal'), token('string'))
+)
+const ruleHead = seqi(token('identifier'), dlit('='))
+const baseExpr = alt(
+  lazyWrapped(lit('('), () => expr, lit(')')),
+  seq(tag('wrapped'), lazyWrapped(
+    lit('['), () => seq(list, terminal, sepExpr, terminal), lit(']')
+  )),
+  seq(tag('identifier'), token('identifier')),
+  terminal,
+)
+// prefix and postfix operators, mutually exclusive
+const opExpr = alt(
+  seq(tag('peek'), dlit('&'), baseExpr),
+  seq(tag('not'), dlit('!'), baseExpr),
+  seq(tag('drop'), dlit('~'), baseExpr),
+  seq(tag('repeat0'), baseExpr, dlit('*')),
+  seq(tag('repeat1'), baseExpr, dlit('+')),
+  seq(tag('maybe'), baseExpr, dlit('?')),
+  baseExpr
+)
+// Expr / "," -> Expr, Expr, Expr ...
+const sepExpr = alt(
+  seq(tag('sepBy'), opExpr, dlit('/'), opExpr),
+  opExpr
+)
+const seqExpr = seq(
+  tag('seq'),
+  repeat(seqi(not(ruleHead), sepExpr)), maybe(token('function'))
+)
+const altExpr = seq(
+  tag('alt'),
+  seqExpr, repeat(seqi(dlit('|'), seqExpr), 0)
+)
+// AddExpr = < . "+" MultExpr >
+const infixExpr = alt(
+  seq(tag('leftInfix'),
+    dlit('<'), dlit('.'), repeat(sepExpr, 1), dlit('>'), token('function')),
+  seq(tag('rightInfix'),
+    dlit('<'), repeat(sepExpr, 1), dlit('.'), dlit('>'), token('function')),
+)
+const expr = alt(
+  seq(
+    tag('altInfix'),
+    infixExpr,
+    repeat(seqi(dlit('|'), infixExpr), 0),
+    dlit('|'),
+    altExpr,
   ),
-  Rule: (p) => seq(tag('rule'), p.RuleHead, p.Expr),
-  RuleHead: (p) => seqi(token('identifier'), dlit('=')),
-  Expr: (p) => alt(
-    seq(
-      tag('altInfix'),
-      p.InfixExpr,
-      repeat(seqi(dlit('|'), p.InfixExpr), 0),
-      dlit('|'),
-      p.AltExpr,
-    ),
-    p.AltExpr
-  ),
-  // AddExpr = < . "+" MultExpr >
-  InfixExpr: (p) => alt(
-    seq(tag('leftInfix'),
-      dlit('<'), dlit('.'), repeat(p.SepExpr, 1), dlit('>'), token('function')),
-    seq(tag('rightInfix'),
-      dlit('<'), repeat(p.SepExpr, 1), dlit('.'), dlit('>'), token('function')),
-  ),
-  AltExpr: (p) => seq(
-    tag('alt'),
-    p.SeqExpr, repeat(seqi(dlit('|'), p.SeqExpr), 0)
-  ),
-  SeqExpr: (p) => seq(
-    tag('seq'),
-    repeat(seqi(not(p.RuleHead), p.SepExpr)), maybe(token('function'))
-  ),
-  // Expr / "," -> Expr, Expr, Expr ...
-  SepExpr: (p) => alt(
-    seq(tag('sepBy'), p.OpExpr, dlit('/'), p.OpExpr),
-    p.OpExpr
-  ),
-  // prefix and postfix operators, mutually exclusive
-  OpExpr: (p) => alt(
-    seq(tag('peek'), dlit('&'), p.BaseExpr),
-    seq(tag('not'), dlit('!'), p.BaseExpr),
-    seq(tag('drop'), dlit('~'), p.BaseExpr),
-    seq(tag('repeat0'), p.BaseExpr, dlit('*')),
-    seq(tag('repeat1'), p.BaseExpr, dlit('+')),
-    seq(tag('maybe'), p.BaseExpr, dlit('?')),
-    p.BaseExpr
-  ),
-  BaseExpr: (p) => alt(
-    wrappedWith(lit('('), p.Expr, lit(')')),
-    seq(tag('wrapped'), wrappedWith(
-      lit('['),
-      seq(list, p.Terminal, p.SepExpr, p.Terminal),
-      lit(']')
-    )),
-    seq(tag('identifier'), token('identifier')),
-    p.Terminal,
-  ),
-  Terminal: () => alt(
-    seq(tag('token'), dlit('%'), token('identifier')),
-    seq(tag('literal'), token('string'))
-  ),
-})
+  altExpr
+)
+const rule = seq(tag('rule'), ruleHead, expr)
+const program = alt(
+  seq(tag('program'), repeat(rule, 1)),
+  expr,
+  seq(tag('nil'), end),
+)
 
 const compiler = createCompiler({
   program: (rules, ctx) => {
@@ -167,11 +161,13 @@ const literals = [
   '<', '>', '(', ')', '[', ']',
   '.', '=', '|', '/', '*', '+', '?', '&', '!', '~', '%',
 ]
+
+const rootParser = seq(compiler, program)
 const rootTokenizer = createBasicTokenizer(literals)
 
 export function lang (strings, ...interpolations) {
   const tokens = Array.from(tokenize(rootTokenizer, strings, interpolations))
-  const childParser = parse(rootParser.Program, tokens)
+  const childParser = parse(rootParser, tokens)
   const childLiterals = tokens.filter((t) => t.type === 'string').map((t) => t.value)
   const childTokenizer = createBasicTokenizer(childLiterals)
   const childTTS = (strings, ...interpolations) => {
