@@ -1,4 +1,4 @@
-import { end, alt, seq, repeat, token as tok, lit, drop, not, maybe, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
+import { nil, alt, seq, repeat, token as tok, lit, drop, not, maybe, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
 import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -72,7 +72,7 @@ const rule = seq(tag('rule'), ruleHead, expr)
 const program = alt(
   seq(tag('program'), repeat(rule, 1)),
   expr,
-  seq(tag('nil'), end),
+  seq(tag('nil'), nil),
 )
 
 const compiler = createCompiler({
@@ -85,7 +85,7 @@ const compiler = createCompiler({
     const firstRuleID = rules[0][1]
     return ctx.scope[firstRuleID]
   },
-  nil: () => end,
+  nil: () => nil,
   rule: (name, rule, ctx) => {
     ctx.scope[name] = ctx.eval(rule)
   },

@@ -8,7 +8,7 @@
  */
 const $t = (type, value = null, meta = {}) => ({ type, value, meta })
 
-export class ParseSubject {
+class ParseSubject {
   /**
    * @param {Token[]} tokens
    * @param {number} index
@@ -24,7 +24,7 @@ const error = (err, index) => new ParserError(err, index)
 const update = (subject, output) => new ParseSubject(subject.tokens, output.index)
 const atIndex = (subject) => subject.tokens[subject.index]
 
-export class Parser {
+class Parser {
   /**
    * make a parser that evaluates lazily (e.g. for recursive definitions).
    * @param {() => parseFn} parserThunk
@@ -64,7 +64,7 @@ export function test_Parser_lazy (expect) {
   expect(parse(Expr, tokens)).toEqual(123)
 }
 
-export class ParserOutput {
+class ParserOutput {
   /**
    * @param {any} node
    * @param {number} index
@@ -76,7 +76,7 @@ export class ParserOutput {
   }
 }
 
-export class ParserError {
+class ParserError {
   constructor (error, index) {
     this.ok = false
     this.error = error
@@ -95,12 +95,6 @@ export function test_nil_matches_an_empty_sequence (expect) {
     parse(nil, [$t('foo')])
   }).toThrow()
 }
-
-/**
- * matches the end of input.
- */
-export const end = new Parser((subject) =>
-  subject.index === subject.tokens.length ? output(null, subject.index) : error('not at end', subject.index))
 
 /**
  * matches if matchFn(token) returns true.
