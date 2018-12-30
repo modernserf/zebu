@@ -160,7 +160,7 @@ const QUOTE = Symbol('QUOTE')
 const quote = (fn, values) => ({ [QUOTE]: () => unquote(fn)(...values.map(unquote)) })
 const unquote = (x) => x && x[QUOTE] ? x[QUOTE]() : x
 
-export const CUT = Symbol('CUT')
+const CUT = Symbol('CUT')
 
 const DROP = Symbol('DROP')
 class SeqParser {
@@ -327,10 +327,8 @@ export function test_sepBy (expect) {
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
 
-export const wrappedWith = (left, getContent, right) => alt(
-  seq((x) => x, drop(left), new LazyParser(getContent), CUT, drop(right)),
-  // seq((x) => x, peek(right), CUT, not(right)),
-)
+export const wrappedWith = (left, getContent, right) =>
+  seq((x) => x, drop(left), CUT, new LazyParser(getContent), right)
 
 export function test_wrappedWith (expect) {
   const tokens = [

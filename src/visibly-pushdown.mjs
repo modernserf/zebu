@@ -4,6 +4,12 @@ import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
 class ScopeNotDefinedError extends Error {}
+class WrapCtxError extends Error {
+  constructor (value, top, bottom) {
+    super()
+    this.message = `"${value}" cannot be used as both ${top} and ${bottom}`
+  }
+}
 
 const id = (x) => x
 const list = (...xs) => xs
@@ -71,19 +77,33 @@ const expr = alt(
 const rule = seq(tag('rule'), ruleHead, expr)
 const program = alt(
   seq(tag('program'), repeat(rule, 1)),
-  expr,
+  seq(tag('singleExpr'), expr),
   seq(tag('nil'), nil),
 )
+
+const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
+  if (ctx.usedTerminals[value] &&
+    ctx.usedTerminals[value] !== wrapCtx) {
+    throw new WrapCtxError(value, wrapCtx, ctx.usedTerminals[value])
+  }
+  ctx.usedTerminals[value] = wrapCtx
+  return parser(value)
+}
 
 const compiler = createCompiler({
   program: (rules, ctx) => {
     ctx.scope = {}
+    ctx.usedTerminals = {}
     // iterate through rules bottom-to-top
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
     const firstRuleID = rules[0][1]
     return ctx.scope[firstRuleID]
+  },
+  singleExpr: (expr, ctx) => {
+    ctx.usedTerminals = {}
+    return ctx.eval(expr)
   },
   nil: () => nil,
   rule: (name, rule, ctx) => {
@@ -127,9 +147,9 @@ const compiler = createCompiler({
   maybe: (expr, ctx) => maybe(ctx.eval(expr)),
   wrapped: ([start, content, end], ctx) =>
     wrappedWith(
-      ctx.eval(start),
+      ctx.evalWith('startToken')(start),
       () => ctx.eval(content),
-      ctx.eval(end)
+      ctx.evalWith('endToken')(end)
     ),
   identifier: (name, ctx) => {
     if (!ctx.scope) { throw new ScopeNotDefinedError(name) }
@@ -139,8 +159,8 @@ const compiler = createCompiler({
     }
     return rule
   },
-  token: (type) => token(type),
-  literal: (value) => lit(value),
+  token: compileTerminal(token),
+  literal: compileTerminal(lit),
 })
 
 function createCompiler (model) {
@@ -198,6 +218,16 @@ export function test_lang_recursive_rules (expect) {
   expect(math`-123`).toEqual(-123)
   expect(math`(123)`).toEqual(123)
   expect(math`-(-(123))`).toEqual(123)
+}
+
+export function test_lang_recursive_rule_errors (expect) {
+  expect(() => { lang`Rule = ["( %number "("]` }).toThrow()
+  expect(() => {
+    lang`
+      Root = ["( Value ")"]
+      Value = "("
+    `
+  }).toThrow()
 }
 
 export function test_lang_repeaters (expect) {
