@@ -1,8 +1,8 @@
 /**
- * mock interface for token (see tokenizer.js)
- * @typedef {{type: string, value: any, meta: object}} Token
+ * mock interface for token
+ * @typedef {{type: string, value: any}} Token
  */
-const $t = (type, value = null, meta = {}) => ({ type, value, meta })
+const $t = (type, value = null) => ({ type, value })
 
 class ParseSubject {
   /**
@@ -98,17 +98,10 @@ class MatchParser {
 }
 
 /**
- * matches if matchFn(token) returns true.
- * @param {(t: Token) => boolean} matchFn
- * @param {any} error
- */
-export const matchToken = (matchFn, err = 'did not match') => new MatchParser(matchFn, err)
-
-/**
  * matches if token.type === type.
  * @param {string} type
  */
-export const token = (type) => matchToken(
+export const token = (type) => new MatchParser(
   tok => tok.type === type,
   ['did not match type', type])
 
@@ -121,7 +114,7 @@ export function test_token_matches_a_type (expect) {
  * matches if token.value === string, and token is not itself a string.
  * @param {string} string
  */
-export const lit = (string) => matchToken(
+export const lit = (string) => new MatchParser(
   tok => tok.value === string && tok.type !== 'string',
   ['did not match value', lit])
 
@@ -130,31 +123,6 @@ export function test_lit_matches_values (expect) {
   const tokens = [$t('structure', '(')]
   expect(parse(parser, tokens)).toEqual($t('structure', '('))
 }
-
-/**
- * matches if token.value has truthy-valued props with these names.
- * @param  {...string} methods
- */
-export const hasProps = (...methods) =>
-  matchToken((tok) => tok.value && methods.every((m) => tok.value[m]))
-
-export function test_hasProps_matches_objects (expect) {
-  const parser = hasProps('foo')
-  const tokens = [$t('structure', { foo: 1 })]
-  expect(parse(parser, tokens)).toEqual($t('structure', { foo: 1 }))
-}
-
-/**
- * Object with a test method (e.g. a regular expression).
- * @typedef {{ test: (value: any) => boolean }} Tester
- */
-
-/**
- * matches if tester.test(token.value) returns true.
- * @param {Tester} tester
- */
-export const testValue = (tester) =>
-  matchToken((tok) => tester.test(tok.value))
 
 const QUOTE = Symbol('QUOTE')
 const quote = (fn, values) => ({ [QUOTE]: () => unquote(fn)(...values.map(unquote)) })
