@@ -29,7 +29,7 @@ const ruleHead = seqi(token('identifier'), dlit('='))
 const baseExpr = alt(
   wrappedWith(lit('('), () => expr, lit(')')),
   seq(tag('wrapped'), wrappedWith(
-    lit('['), () => seq(list, terminal, sepExpr, terminal), lit(']')
+    lit('['), () => seq(list, terminal, sepExpr, terminal, maybe(token('function'))), lit(']')
   )),
   seq(tag('identifier'), token('identifier')),
   terminal,
@@ -211,7 +211,7 @@ export function test_lang_recursive_rules (expect) {
   const math = lang`
     Neg   = ~"-" Expr ${(value) => -value}
           | Expr
-    Expr  = ["(" Neg ")"]
+    Expr  = ["(" Neg ")" ${(_, x) => x}]
           | %number
   `
   expect(math`123`).toEqual(123)

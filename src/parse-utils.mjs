@@ -295,8 +295,9 @@ export function test_sepBy (expect) {
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
 
-export const wrappedWith = (left, getContent, right) =>
-  seq((x) => x, drop(left), CUT, new LazyParser(getContent), right)
+const _2 = (_, x) => x
+export const wrappedWith = (left, getContent, right, mapFn = _2) =>
+  seq(mapFn, left, CUT, new LazyParser(getContent), right)
 
 export function test_wrappedWith (expect) {
   const tokens = [
