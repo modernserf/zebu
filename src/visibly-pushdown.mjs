@@ -49,10 +49,14 @@ const sepExpr = alt(
   seq(tag('sepBy'), opExpr, dlit('/'), opExpr),
   opExpr
 )
-const seqExpr = seq(
-  tag('seq'),
-  repeat(seqi(not(ruleHead), sepExpr)), maybe(token('function'))
+const seqExpr = alt(
+  seq(
+    tag('seq'),
+    repeat(sepExpr, 1), token('function')
+  ),
+  sepExpr,
 )
+
 const altExpr = seq(
   tag('alt'),
   seqExpr, repeat(seqi(dlit('|'), seqExpr), 0)
@@ -199,11 +203,11 @@ export function lang (strings, ...interpolations) {
 
 export function test_lang_nil_language (expect) {
   const nil = lang``
-  expect(nil``).toEqual(undefined)
+  expect(nil``).toEqual(null)
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`~"(" %number ")"`
+  const num = lang`~"(" %number ")" ${id}`
   expect(num`(123)`).toEqual(123)
 }
 

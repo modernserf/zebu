@@ -28,15 +28,15 @@ class ParserOutput {
 }
 
 class ParserError {
-  constructor (error, index) {
+  constructor (error, subject) {
     this.ok = false
     this.error = error
-    this.index = index
+    this.subject = subject
   }
 }
 
 const output = (node, index) => new ParserOutput(node, index)
-const error = (err, index) => new ParserError(err, index)
+const error = (err, subject) => new ParserError(err, subject)
 const update = (subject, output) => new ParseSubject(subject.tokens, output.index)
 const atIndex = (subject) => subject.tokens[subject.index]
 
@@ -90,10 +90,10 @@ class MatchParser {
   }
   parse (subject) {
     const token = atIndex(subject)
-    if (!token) { return error('unexpected end of input', subject.index) }
+    if (!token) { return error('unexpected end of input', subject) }
     return this.matchFn(token)
       ? output(atIndex(subject), subject.index + 1)
-      : error(this.err, subject.index)
+      : error(this.err, subject)
   }
 }
 
@@ -202,7 +202,7 @@ class AltParser {
       if (res.ok) { return res }
       errors.push(res.error)
     }
-    return error(['alts failed:', errors], subject.index)
+    return error(['alts failed:', errors], subject)
   }
 }
 
@@ -234,7 +234,7 @@ class RepeatParser {
       subject = update(subject, res)
     }
     if (out.length < this.min) {
-      return error(['not enough items', this.parser, this.min], subject.index)
+      return error(['not enough items', this.parser, this.min], subject)
     }
     return output(quote((...xs) => xs, out), subject.index)
   }
@@ -276,8 +276,8 @@ export const sepBy = (valueParser, separatorParser, min, max) =>
   seq(
     (head, tail) => [head, ...tail],
     valueParser, repeat(seq(
-      (_, value) => value,
-      separatorParser, valueParser
+      (x) => x,
+      drop(separatorParser), valueParser
     ), min, max))
 
 export function test_sepBy (expect) {
@@ -291,6 +291,19 @@ export function test_sepBy (expect) {
   const parser = sepBy(
     seq(({ value }) => value, token('identifier')),
     token('bar')
+  )
+  expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
+}
+
+export function test_sepBy_peek (expect) {
+  const tokens = [
+    $t('identifier', 'x'),
+    $t('identifier', 'y'),
+    $t('identifier', 'z'),
+  ]
+  const parser = sepBy(
+    seq(({ value }) => value, token('identifier')),
+    peek(token('identifier'))
   )
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
@@ -322,7 +335,7 @@ class NotParser {
   }
   parse (subject) {
     return this.parser.parse(subject).ok
-      ? error(['unexpected', this.parser], subject.index)
+      ? error(['unexpected', this.parser], subject)
       : output(DROP, subject.index)
   }
 }
@@ -339,7 +352,7 @@ class PeekParser {
   parse (subject) {
     return this.parser.parse(subject).ok
       ? output(DROP, subject.index)
-      : error(['expected', this.parser], subject.index)
+      : error(['expected', this.parser], subject)
   }
 }
 
