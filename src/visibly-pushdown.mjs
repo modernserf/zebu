@@ -79,11 +79,8 @@ const expr = alt(
   altExpr
 )
 const rule = seq(tag('rule'), ruleHead, expr)
-const program = alt(
-  seq(tag('program'), repeat(rule, 1)),
-  seq(tag('singleExpr'), expr),
-  seq(tag('nil'), nil),
-)
+const notRuleHead = seqi(not(ruleHead), expr)
+const program = seq(tag('program'), alt(notRuleHead, nil), repeat(rule, 0))
 
 const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
   if (ctx.usedTerminals[value] &&
@@ -95,21 +92,19 @@ const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
 }
 
 const compiler = createCompiler({
-  program: (rules, ctx) => {
+  program: (expr, rules = [], ctx) => {
     ctx.scope = {}
     ctx.usedTerminals = {}
     // iterate through rules bottom-to-top
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
+    if (expr) { return ctx.eval(expr) }
+    if (!rules.length) { return nil }
+
     const firstRuleID = rules[0][1]
     return ctx.scope[firstRuleID]
   },
-  singleExpr: (expr, ctx) => {
-    ctx.usedTerminals = {}
-    return ctx.eval(expr)
-  },
-  nil: () => nil,
   rule: (name, rule, ctx) => {
     ctx.scope[name] = ctx.eval(rule)
   },
