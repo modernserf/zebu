@@ -1,5 +1,4 @@
 import { lang } from '../index'
-import { maybe } from '../parse-utils.mjs'
 
 const eq = (l, r) => {
   if (l === r) { return true }

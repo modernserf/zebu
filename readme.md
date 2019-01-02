@@ -2,56 +2,83 @@
 
 ## What is this?
 
-This is a library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf)
-with [tagged template strings](http://2ality.com/2016/11/computing-tag-functions.html)
-using a [parsing expression grammar](https://en.m.wikipedia.org/wiki/Parsing_expression_grammar).
+LLL is a JavaScript library for making parsers that are as convenient to use as regular expressions but as readable and powerful as parser generators. It is particularly well-suited for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) and [DSLs](https://en.wikipedia.org/wiki/Domain-specific_language).
 
 ## What does that look like?
+
+Match a US phone number:
+
+```js
+const digits = (count) => repeat(/\d/, { min: count, max: count }).map((ds) => ds.join(""))
+const phone = lang`
+  Root      = ("+"? "1" _)? AreaCode (_ "-"? _) Exchange (_ "-"? _) Line
+              ${(_, areaCode, __,  exchange, ___, line) => ({ areaCode, exchange, line })}
+  AreaCode  = "(" _ ${digits(3)} _ ")" ${(_, __, digits) => digits}
+            | ${digits(3)}
+  Exchange  = ${digits(3)}
+  Line      = ${digits(4)}
+  _         = %whitespace*
+`
+phone.match("+1 (800) 555-1234") 
+// { ok: true, value: { areaCode: "800", exchange: "555", line: "1234" } }
+```
+
+Versus with regular expressions:
+```js
+const phone = /^\+1\s*(?:\((\d{3})\)|(\d{3}))\s*-?\s*(\d{3})\s*-?\s*(\d{4})$/
+phone.exec("+1 (800) 555-1234")
+// ["+1 (800) 555-1234", "800", null, 555, 1234]
+```
+
+## Why is this better than the alternatives?
+
+### Regexes
+
+- **Regexes are designed to be compact, at the expense of all other features.** Character classes are typically represented with a single escaped letter (e.g. `\w`), which is quite terse but not particularly readable. Formatting with whitespace is not permitted, because whitespace matches _literal_ spaces. Regexes that match control characters (e.g. `(` or `+`) need additional escape characters. LLL requires you to quote strings and requires more explicit handling of character classes and matching, but it results in parsers that are much easier to read. 
+
+- **Regexes are not composable.** Most regexes don't have named variables, nor do they let you build regexes out of smaller regexes. Some regexes allow you to name your capture groups, but nevertheless provide no way of composing capture results. LLL is designed for composability: you can define subexpressions within a parser and interpolate parsers into other parsers. You can even interpolate regexes into LLL parsers!
+
+- **Regexes can't match arbitrary structures.** While most regexes are more expressive than the language theoretical definition of [regular languages](https://en.wikipedia.org/wiki/Regular_grammar), most are still unsuited for tasks like [parsing XML](https://stackoverflow.com/questions/1732348/regex-match-open-tags-except-xhtml-self-contained-tags) or balanced brackets. The tools LLL provides do not have these restrictions.
+
+
+
+
+
+
+
+ parsing library that uses [tagged template strings](http://2ality.com/2016/11/computing-tag-functions.html) to define grammars. 
+
+
+
+
+
+
+
+This is a library for building [little languages]
+with [tagged template strings]
+using a [PEG](https://en.m.wikipedia.org/wiki/Parsing_expression_grammar)-inspired syntax.
+
+
 
 ```js
 import { lang } from "@modernserf/little-language-lab";
 
-const leftAssociative = (l, rs) => rs.reduce((value, fn) => fn(value), l)
 const math = lang`
-  AddExpr = MulExpr AddOp*  ${leftAssociative}
-  AddOp   = "+" MulExpr     ${(_, r) => (l) => l + r}
-          | "-" MulExpr     ${(_, r) => (l) => l - r}
-  MulExpr = Expr MulOp*     ${leftAssociative}
-  MulOp   = "*" Expr        ${(_, r) => (l) => l * r}
-          | "/" Expr        ${(_, r) => (l) => l / r}
-  Expr    = "(" AddExpr ")" ${(_, value) => value}
-          | "-" Expr        ${(_, value) => -value}
-          | number          ${({ value }) => value}
+  AddExpr   = < . "+" MulExpr > ${(l, _, r) => l + r}
+            | < . "-" MulExpr > ${(l, _, r) => l - r}
+            | MulExpr
+  MulExpr   = < . "*" NegExpr > ${(l, _, r) => l * r}
+            | < . "/" NegExpr > ${(l, _, r) => l / r}
+            | NegExpr
+  NegExpr   = "-" BaseExpr      ${(_, x) => -x}
+            | BaseExpr
+  BaseExpr  = ["(" AddExpr ")"]
+            | %number
 `
 math`(-3.5 + 4) * 200` // => 100
 ```
 
-Another, slightly more complex example:
 
-```js
-import { lang } from "@modernserf/little-language-lab";
-
-function interpreter (tokens) {
-  const stack = []
-  tokens.forEach(t => t(stack))
-  return stack[0]
-}
-
-const op = (fn) => (stack) => {
-  stack.push(fn(stack.pop(), stack.pop()))
-}
-
-const rpn = lang`
-  Program = Expr * ${interpreter}
-  Expr    = Number | Fn
-  Number  = number ${({ value }) => (stack) => stack.push(value)}
-  Fn      = "+" ${op((r, l) => l + r)}  # note: operands are in reverse order,
-          | "-" ${op((r, l) => l - r)}  # because the right operand is popped 
-          | "*" ${op((r, l) => l * r)}  # before the left one.
-          | "/" ${op((r, l) => l / r)}
-`
-rpn`-3.5 4 + 200 *` // => 100
-```
 
 ## Why would I want to do that?
 
