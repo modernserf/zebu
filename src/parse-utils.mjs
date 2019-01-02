@@ -211,7 +211,8 @@ class AltParser {
  * outputs the output of the first parser that matches.
  * @param  {...Parser} parsers
  */
-export const alt = (...parsers) => new AltParser(parsers)
+export const alt = (...parsers) =>
+  parsers.length > 1 ? new AltParser(parsers) : parsers[0]
 
 export function test_alt_matches_one_of_options (expect) {
   const parser = alt(token('foo'), token('bar'))

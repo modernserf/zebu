@@ -57,10 +57,7 @@ const seqExpr = alt(
   sepExpr,
 )
 
-const altExpr = seq(
-  tag('alt'),
-  seqExpr, repeat(seqi(dlit('|'), seqExpr), 0)
-)
+const altExpr = seq(tag('alt'), sepBy(seqExpr, lit('|')))
 // AddExpr = < . "+" MultExpr >
 const infixExpr = alt(
   seq(tag('leftInfix'),
@@ -71,10 +68,8 @@ const infixExpr = alt(
 const expr = alt(
   seq(
     tag('altInfix'),
-    infixExpr,
-    repeat(seqi(dlit('|'), infixExpr), 0),
-    dlit('|'),
-    altExpr,
+    sepBy(infixExpr, lit('|')),
+    dlit('|'), altExpr,
   ),
   altExpr
 )
@@ -108,11 +103,12 @@ const compiler = createCompiler({
   rule: (name, rule, ctx) => {
     ctx.scope[name] = ctx.eval(rule)
   },
-  altInfix: ([hTag, hSeq, hFn], ts, base, ctx) => {
+  altInfix: (ts, base, ctx) => {
     base = ctx.eval(base)
+    const hTag = ts[0][0]
     const asInfixFn = hTag === 'leftInfix' ? asLeftFn : asRightFn
 
-    const seqs = [seq(asInfixFn(hFn), ...hSeq.map(ctx.eval))]
+    const seqs = []
     for (const [tTag, tSeq, tFn] of ts) {
       if (tTag !== hTag) { throw new MismatchedOperatorExpressionError(tag) }
       seqs.push(seq(asInfixFn(tFn), ...tSeq.map(ctx.eval)))
@@ -133,9 +129,7 @@ const compiler = createCompiler({
     left(fn, ctx.eval(base), ...xs.map(ctx.eval)),
   rightInfix: (xs, fn, ctx, base) =>
     right((p) => alt(seq(fn, ...xs.map(ctx.eval), p), ctx.eval(base))),
-  alt: (h, t, ctx) => t.length
-    ? alt(ctx.eval(h), ...t.map(ctx.eval))
-    : ctx.eval(h),
+  alt: (xs, ctx) => alt(...xs.map(ctx.eval)),
   seq: (exprs, fn = id, ctx) => seq(fn, ...exprs.map(ctx.eval)),
   sepBy: (expr, sep, ctx) => alt(sepBy(ctx.eval(expr), ctx.eval(sep)), nil),
   peek: (expr, ctx) => peek(ctx.eval(expr)),
