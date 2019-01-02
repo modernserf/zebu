@@ -1,4 +1,4 @@
-import { nil, alt, seq, repeat, token as tok, lit, drop, not, maybe, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
+import { nil, alt, seq, repeat, token as tok, lit, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
 import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -29,7 +29,7 @@ const ruleHead = seqi(token('identifier'), dlit('='))
 const baseExpr = alt(
   wrappedWith(lit('('), () => expr, lit(')')),
   seq(tag('wrapped'), wrappedWith(
-    lit('['), () => seq(list, terminal, sepExpr, terminal, maybe(token('function'))), lit(']')
+    lit('['), () => seq(list, terminal, sepExpr, terminal, alt(token('function'), nil)), lit(']')
   )),
   seq(tag('identifier'), token('identifier')),
   terminal,
@@ -142,13 +142,13 @@ const compiler = createCompiler({
     ? alt(ctx.eval(h), ...t.map(ctx.eval))
     : ctx.eval(h),
   seq: (exprs, fn = id, ctx) => seq(fn, ...exprs.map(ctx.eval)),
-  sepBy: (expr, sep, ctx) => maybe(sepBy(ctx.eval(expr), ctx.eval(sep))),
+  sepBy: (expr, sep, ctx) => alt(sepBy(ctx.eval(expr), ctx.eval(sep)), nil),
   peek: (expr, ctx) => peek(ctx.eval(expr)),
   not: (expr, ctx) => not(ctx.eval(expr)),
   drop: (expr, ctx) => drop(ctx.eval(expr)),
   repeat0: (expr, ctx) => repeat(ctx.eval(expr), 0),
   repeat1: (expr, ctx) => repeat(ctx.eval(expr), 1),
-  maybe: (expr, ctx) => maybe(ctx.eval(expr)),
+  maybe: (expr, ctx) => alt(ctx.eval(expr), nil),
   wrapped: ([start, content, end], ctx) =>
     wrappedWith(
       ctx.evalWith('startToken')(start),
@@ -203,7 +203,7 @@ export function lang (strings, ...interpolations) {
 
 export function test_lang_nil_language (expect) {
   const nil = lang``
-  expect(nil``).toEqual(null)
+  expect(nil``).toEqual(undefined)
 }
 
 export function test_lang_single_expression (expect) {

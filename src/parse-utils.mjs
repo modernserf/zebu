@@ -74,10 +74,10 @@ export function test_LazyParser (expect) {
 /**
  * consumes no input, always succeeds
  */
-export const nil = { parse: ({ index }) => output(null, index) }
+export const nil = { parse: ({ index }) => output(undefined, index) }
 
 export function test_nil_matches_an_empty_sequence (expect) {
-  expect(parse(nil, [])).toEqual(null)
+  expect(parse(nil, [])).toEqual(undefined)
   expect(() => {
     parse(nil, [$t('foo')])
   }).toThrow()
@@ -260,8 +260,6 @@ export function test_repeat (expect) {
   const parser = seq(x => x, repeat(seq(({ value }) => value, token('identifier'))), token('foo'))
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
-
-export const maybe = (parser) => seq(([x]) => x, repeat(parser, 0, 1))
 
 /**
  * match a sequence of valueParser, separated by separatorParser,

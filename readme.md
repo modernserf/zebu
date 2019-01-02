@@ -60,3 +60,28 @@ but the tools for building languages in javascript tend to be built around the a
 your language is being defined at compile time, and few are designed to take advantage
 of tagged template strings' interpolation abilities.
 
+
+
+goals:
+- possible to completely define a lexer + parser + interepreter in a single expression
+- composable -- parsers can be built out of other parsers; handling for piping output of one into another
+- good defaults for common structures with built-in error handling
+
+
+four phases:
+- tokenize: [char] -> tag(value)
+- skeletonize: [token] -> [token] | tag(skeleton)
+- parse: [skeleton] -> value | tag([ast])
+- compile: ast -> value
+
+`[ Start Content End ]`
+- tokenizer: 
+  + creates tokens for Start & End; error if they cannot be tokenized
+  + pairs them, so Start must only be used as start, End only as end, must go together; error if theyre used otherwise
+- skeletonizer:
+  + recursively collect tokens between start & end into a single token, e.g. `[ "{" Expr "}" ]` becomes `{ type: "structure", start: startToken end: endToken, content: [...expr tokens...] }`
+  + raise errors if start/end are mismatched
+- parser:
+  + match if the start & end tokens match, and content tokens match recursively
+
+  
