@@ -9,14 +9,15 @@ LLL is a JavaScript library for making parsers that are as convenient to use as 
 Match a US phone number:
 
 ```js
-const digits = (count) => repeat(/\d/, { min: count, max: count }).map((ds) => ds.join(""))
+const join = (...values) => values.join("")
 const phone = lang`
-  Root      = ("+"? "1" _)? AreaCode (_ "-"? _) Exchange (_ "-"? _) Line
-              ${(_, areaCode, __,  exchange, ___, line) => ({ areaCode, exchange, line })}
-  AreaCode  = "(" _ ${digits(3)} _ ")" ${(_, __, digits) => digits}
-            | ${digits(3)}
-  Exchange  = ${digits(3)}
-  Line      = ${digits(4)}
+  Root      = ~("+"? "1" _)? AreaCode ~(_ "-"? _) Exchange ~(_ "-"? _) Line
+              ${(areaCode, exchange, line) => ({ areaCode, exchange, line })}
+  AreaCode  = "(" _ (D D D ${join}) _ ")" ${(_, __, digits) => digits}
+            | D D D   ${join}
+  Exchange  = D D D   ${join}
+  Line      = D D D D ${join}
+  D         = %digit
   _         = %whitespace*
 `
 phone.match("+1 (800) 555-1234") 
@@ -34,30 +35,37 @@ phone.exec("+1 (800) 555-1234")
 
 ### Regexes
 
+LLL can use regular expressions in grammars
+
 - **Regexes are designed to be compact, at the expense of all other features.** Character classes are typically represented with a single escaped letter (e.g. `\w`), which is quite terse but not particularly readable. Formatting with whitespace is not permitted, because whitespace matches _literal_ spaces. Regexes that match control characters (e.g. `(` or `+`) need additional escape characters. LLL requires you to quote strings and requires more explicit handling of character classes and matching, but it results in parsers that are much easier to read. 
 
 - **Regexes are not composable.** Most regexes don't have named variables, nor do they let you build regexes out of smaller regexes. Some regexes allow you to name your capture groups, but nevertheless provide no way of composing capture results. LLL is designed for composability: you can define subexpressions within a parser and interpolate parsers into other parsers. You can even interpolate regexes into LLL parsers!
 
-- **Regexes can't match arbitrary structures.** While most regexes are more expressive than the language theoretical definition of [regular languages](https://en.wikipedia.org/wiki/Regular_grammar), most are still unsuited for tasks like [parsing XML](https://stackoverflow.com/questions/1732348/regex-match-open-tags-except-xhtml-self-contained-tags) or balanced brackets. The tools LLL provides do not have these restrictions.
+- **Regexes can't match recursive structures.** While most regexes are more expressive than the language theoretical definition of [regular languages](https://en.wikipedia.org/wiki/Regular_grammar), most are still unsuited for tasks like [parsing XML](https://stackoverflow.com/questions/1732348/regex-match-open-tags-except-xhtml-self-contained-tags) or balanced brackets. The tools LLL provides do not have these restrictions.
 
+### Parser generators
 
+LLL grammars are modeled after the [BNF style](https://en.wikipedia.org/wiki/Backus%E2%80%93Naur_form) of notation, particularly the notation used by [PEG](https://en.m.wikipedia.org/wiki/Parsing_expression_grammar). 
 
+- **Parser generators typically require a separate compile step.** This is understandable for a file-based workflow, but adds a lot of friction for parsing strings within a JavaScript program.
 
+- **Parser generators are not composable.** Just like regular expressions, most parser generators have no way of building parsers from other parsers.
 
+### Parser combinators
 
+LLL includes a set of parser combinators, and is itself implemented with parser combinators. However, we feel that the LLL syntax has some significant advantages over combinators alone.
 
- parsing library that uses [tagged template strings](http://2ality.com/2016/11/computing-tag-functions.html) to define grammars. 
+- **Parser combinators can make some simple tasks difficult to express.** Left-associative infix operators and mutually recursive parsers are rather inelegant to express with parser combinators. LLL expressions don't have to map 1:1 onto parser combinators and thus avoid some of these difficulties.
 
+- **Parser combinators can have low information density.** Parser combinators in languages like Haskell can use operators to streamline the most common expressions (e.g. alternation and sequences) but these must be expressed as function calls in JavaScript. This means that grammars often have more "plumbing" and punctuation than content.
 
+## Unusual or unique features
 
+LLL grammars are defined with [tagged template strings](http://2ality.com/2016/11/computing-tag-functions.html), which allow you to compose grammars by interpolating strings, regular expressions, parser combinators, or other LLL grammars.
 
+The parsers created by LLL grammars can _themselves_ be used as tagged template strings. This is particularly useful for creating domain-specific languages.
 
-
-
-This is a library for building [little languages]
-with [tagged template strings]
-using a [PEG](https://en.m.wikipedia.org/wiki/Parsing_expression_grammar)-inspired syntax.
-
+LLL always tokenizes its input before parsing it; the token rules are generated from the grammar. 
 
 
 ```js
