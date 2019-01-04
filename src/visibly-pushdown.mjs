@@ -22,7 +22,7 @@ const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
 
 const line = token('line')
-const ignoreLines = drop(repeat(line))
+const ignoreLines = drop(alt(line, nil))
 const wrapIgnoreLines = (parser) => seqi(ignoreLines, parser, ignoreLines)
 const op = (str) => wrapIgnoreLines(dlit(str))
 
@@ -103,7 +103,7 @@ const compiler = createCompiler({
       ctx.eval(rules[i])
     }
     if (expr) { return wrapIgnoreLines(ctx.eval(expr)) }
-    if (!rules.length) { return nil }
+    if (!rules.length) { return seqi(ignoreLines) }
 
     const firstRuleID = rules[0][1]
     return wrapIgnoreLines(ctx.scope[firstRuleID])
@@ -157,7 +157,7 @@ const compiler = createCompiler({
   wrapped: ([start, content, end], ctx) =>
     wrappedWith(
       ctx.evalWith('startToken')(start),
-      () => seqi(ignoreLines, ctx.eval(content), ignoreLines),
+      () => wrapIgnoreLines(ctx.eval(content)),
       ctx.evalWith('endToken')(end)
     ),
   identifier: (name, ctx) => {
@@ -208,7 +208,8 @@ export function lang (strings, ...interpolations) {
 
 export function test_lang_nil_language (expect) {
   const nil = lang``
-  expect(nil``).toEqual(undefined)
+  expect(nil`
+  `).toEqual(undefined)
 }
 
 export function test_lang_single_expression (expect) {

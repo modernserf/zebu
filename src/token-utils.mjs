@@ -68,11 +68,28 @@ export function createBasicTokenizer (literals) {
     identifier: { ...basePatterns.identifier, keywords: moo.keywords({ keyword }) },
     token,
   })
-  lexer.next = ((next) => () => {
-    let tok
-    while ((tok = next()) && tok.type === 'ignore') {}
-    return tok
-  })(lexer.next.bind(lexer))
-  // TODO: after removing comments, consolidate runs of %line into single %line
+
+  let consolidatingLines = false
+  lexer.next = filterIter(lexer.next.bind(lexer), (tok) => {
+    if (tok.type === 'ignore') { return false }
+    if (tok.type === 'line') {
+      if (consolidatingLines) { return false }
+      consolidatingLines = true
+      return true
+    } else {
+      consolidatingLines = false
+      return true
+    }
+  })
   return lexer
+}
+
+function filterIter (next, filterFn) {
+  return () => {
+    let tok
+    while ((tok = next())) {
+      if (filterFn(tok)) { break }
+    }
+    return tok
+  }
 }
