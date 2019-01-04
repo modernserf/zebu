@@ -26,13 +26,12 @@ function * doRange (
 }
 
 export const range = lang`
-  OpenRange = Start ~"..." ${doRange}
-            | Range ~"," OpenRange 
-              ${function * (l, r) { yield * l; yield * r }}
+  OpenRange = < Range ~"," . > ${function * (l, r) { yield * l; yield * r }}
+            | Start ~"..." ${doRange}
             | Range
 
   Range = Start ~"..." End ${doRange}
-        | Value (~"," Value)* ${(h, t) => [h, ...t]}
+        | Value / ","
 
   Start = ExcludeValue ~"," Value ${interval(true)}
         | Value ~"," Value ${interval(false)}
