@@ -13,7 +13,8 @@ export const json = lang`
         | %string
         | "true"  ${() => true}
         | "false" ${() => false}
-        | "null"  ${() => null}
+        | "null"  
+          ${() => null}
 `
 
 export function test_json (expect) {
@@ -21,6 +22,9 @@ export function test_json (expect) {
   expect(json` false `).toEqual(false)
   expect(json` 123.45 `).toEqual(123.45)
   expect(json` "foo" `).toEqual('foo')
-  expect(json`["foo", "bar"]`).toEqual(['foo', 'bar'])
+  expect(json`[
+    "foo", 
+    "bar"
+  ]`).toEqual(['foo', 'bar'])
   expect(json`{"x": {"y": {}}}`).toEqual({ x: { y: {} } })
 }
