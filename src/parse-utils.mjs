@@ -309,7 +309,7 @@ export function test_sepBy_peek (expect) {
 
 const _2 = (_, x) => x
 export const wrappedWith = (left, getContent, right, mapFn = _2) =>
-  seq(mapFn, left, CUT, new LazyParser(getContent), right)
+  seq(mapFn, left, new LazyParser(getContent), CUT, right)
 
 export function test_wrappedWith (expect) {
   const tokens = [

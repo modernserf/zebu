@@ -4,11 +4,12 @@ import * as tokenUtils from './token-utils'
 import * as visiblyPushdown from './visibly-pushdown'
 import * as jsonExample from './examples/json'
 import * as typeExample from './examples/types'
+import * as propTypesExample from './examples/prop-types'
 import * as nondet from './nondet'
 
 const modules = [
-  parseUtils, tokenUtils, visiblyPushdown,
-  jsonExample, typeExample, nondet,
+  parseUtils, tokenUtils, visiblyPushdown, nondet,
+  jsonExample, typeExample, propTypesExample,
 ]
 
 const expect = (value) => ({

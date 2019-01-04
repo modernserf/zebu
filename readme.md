@@ -16,24 +16,24 @@ LLL is JavaScript library for building [little languages](http://staff.um.edu.mt
 dx`.foo.bar`.replace({ foo: { bar: 3 } }, 5) // => { foo: { bar: 5} }
 ```
 
-### React PropTypes 
+### [React PropTypes](https://github.com/modernserf/little-language-lab/blob/master/src/examples/prop-types.mjs)
 ```js
-propTypes`
-	className: string?,
-	type: ("select" | "datalist")?,
-	options: [{ id: string, label: string }],
-	value: string,
-	onChange: func,
+const types = propTypes`
+  className: string?
+  type: ("select" | "datalist")?
+  options: [{ id: string, label: string }]
+  value: string
+  onChange: func
 `
 /* => {
   className: PropTypes.string,
-  type: PropTypes.oneOf("select", "datalist"),
-  options: PropTypes.arrayOf(
+  type: PropTypes.oneOf(["select", "datalist"]),
+  options: PropTypes.arrayOf([
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       label: PropTypes.string.isRequired,
     }).isRequired
-  ).isRequired,
+  ]).isRequired,
   value: PropTypes.string.isRequired,
   onChange: PropTypes.func.isRequired,
 } */
@@ -41,9 +41,9 @@ propTypes`
 
 ### Matrix math operations
 ```js
-const x =  [
-  [7, 1], 
-  [-2, 3]
+const x = [
+  [7, 1],
+  [-2, 3],
 ]
 matrix`
   [ 2 0 
