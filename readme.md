@@ -8,12 +8,12 @@ LLL is JavaScript library for building [little languages](http://staff.um.edu.mt
 
 ### [Ranges](https://github.com/modernserf/little-language-lab/blob/master/src/examples/range.mjs) 
 ```js
-[...range`1,3 ... (10)`] // => [1,3,5,7,9]
+range`1,3 ... (10)` // => yields 1, 3, 5, 7, 9
 ```
 
 ### [Data expressions](http://justinfalcone.com/data-expressions/)
 ```js
-dx`.foo.bar`.replace({ foo: { bar: 3 } }, 5) // => { foo: { bar: 5} }
+dx`.foo.bar`.replace({ foo: { bar: 3 } }, 5) // => { foo: { bar: 5 } }
 ```
 
 ### [React PropTypes](https://github.com/modernserf/little-language-lab/blob/master/src/examples/prop-types.mjs)
@@ -68,7 +68,7 @@ traffic.start() // log { type: "green" }
 traffic.send({ type: "timer" }) // log { type: "yellow" }
 ```
 
-## Text matching
+### Text matching
 ```js
 const joinObjects = (objects) => objects.reduce((l, r) => Object.assign(l, r), {})
 const url = text`
