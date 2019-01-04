@@ -21,11 +21,15 @@ const tag = (type) => (...values) => [type, ...values]
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
 
+const line = token('line')
+const ignoreLines = drop(repeat(line))
+const wrapIgnoreLines = (parser) => seqi(ignoreLines, parser, ignoreLines)
+const op = (str) => wrapIgnoreLines(dlit(str))
+
 const terminal = alt(
   seq(tag('token'), dlit('%'), token('identifier')),
   seq(tag('literal'), token('string'))
 )
-const ruleHead = seqi(token('identifier'), dlit('='))
 const baseExpr = alt(
   wrappedWith(lit('('), () => expr, lit(')')),
   seq(tag('wrapped'), wrappedWith(
@@ -49,15 +53,12 @@ const sepExpr = alt(
   seq(tag('sepBy'), opExpr, dlit('/'), opExpr),
   opExpr
 )
-const seqExpr = alt(
-  seq(
-    tag('seq'),
-    repeat(sepExpr, 1), token('function')
-  ),
-  sepExpr,
+const seqExpr = seq(
+  tag('seq'),
+  repeat(sepExpr, 1), alt(seqi(ignoreLines, token('function')), nil)
 )
 
-const altExpr = seq(tag('alt'), sepBy(seqExpr, lit('|')))
+const altExpr = seq(tag('alt'), sepBy(seqExpr, op('|')))
 // AddExpr = < . "+" MultExpr >
 const infixExpr = alt(
   seq(tag('leftInfix'),
@@ -68,14 +69,21 @@ const infixExpr = alt(
 const expr = alt(
   seq(
     tag('altInfix'),
-    sepBy(infixExpr, lit('|')),
-    dlit('|'), altExpr,
+    sepBy(infixExpr, op('|')),
+    drop(op('|')), altExpr,
   ),
   altExpr
 )
+const ruleHead = seqi(token('identifier'), dlit('='))
 const rule = seq(tag('rule'), ruleHead, expr)
 const notRuleHead = seqi(not(ruleHead), expr)
-const program = seq(tag('program'), alt(notRuleHead, nil), repeat(rule, 0))
+const program = seq(tag('program'),
+  ignoreLines,
+  alt(notRuleHead, nil),
+  ignoreLines,
+  alt(sepBy(rule, line), nil),
+  ignoreLines
+)
 
 const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
   if (ctx.usedTerminals[value] &&
@@ -94,11 +102,11 @@ const compiler = createCompiler({
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
-    if (expr) { return ctx.eval(expr) }
+    if (expr) { return wrapIgnoreLines(ctx.eval(expr)) }
     if (!rules.length) { return nil }
 
     const firstRuleID = rules[0][1]
-    return ctx.scope[firstRuleID]
+    return wrapIgnoreLines(ctx.scope[firstRuleID])
   },
   rule: (name, rule, ctx) => {
     ctx.scope[name] = ctx.eval(rule)
@@ -111,7 +119,7 @@ const compiler = createCompiler({
     const seqs = []
     for (const [tTag, tSeq, tFn] of ts) {
       if (tTag !== hTag) { throw new MismatchedOperatorExpressionError(tag) }
-      seqs.push(seq(asInfixFn(tFn), ...tSeq.map(ctx.eval)))
+      seqs.push(seq(asInfixFn(tFn), ignoreLines, ...tSeq.map(ctx.eval)))
     }
     if (hTag === 'leftInfix') {
       return seq(
@@ -131,7 +139,15 @@ const compiler = createCompiler({
     right((p) => alt(seq(fn, ...xs.map(ctx.eval), p), ctx.eval(base))),
   alt: (xs, ctx) => alt(...xs.map(ctx.eval)),
   seq: (exprs, fn = id, ctx) => seq(fn, ...exprs.map(ctx.eval)),
-  sepBy: (expr, sep, ctx) => alt(sepBy(ctx.eval(expr), ctx.eval(sep)), nil),
+  sepBy: (expr, sep, ctx) => {
+    sep = ctx.eval(sep)
+    return alt(
+      sepBy(
+        ctx.eval(expr),
+        seqi(alt(sep, seqi(ignoreLines, sep)), ignoreLines)
+      ),
+      nil)
+  },
   peek: (expr, ctx) => peek(ctx.eval(expr)),
   not: (expr, ctx) => not(ctx.eval(expr)),
   drop: (expr, ctx) => drop(ctx.eval(expr)),
@@ -141,7 +157,7 @@ const compiler = createCompiler({
   wrapped: ([start, content, end], ctx) =>
     wrappedWith(
       ctx.evalWith('startToken')(start),
-      () => ctx.eval(content),
+      () => seqi(ignoreLines, ctx.eval(content), ignoreLines),
       ctx.evalWith('endToken')(end)
     ),
   identifier: (name, ctx) => {
@@ -232,8 +248,8 @@ export function test_lang_repeaters (expect) {
     .toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
   const nonEmptyList = lang`
-    Expr = ["(" Expr+ ")"]
-         | %identifier
+    Expr  = ["(" Expr+ ")"]
+          | %identifier
   `
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`)
     .toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
@@ -253,12 +269,15 @@ export function test_lang_operator_precedence_assoc (expect) {
     NegExpr = ~"-" Expr           ${(x) => -x}
     PowExpr = < Expr ~"**" . >    ${(l, r) => l ** r}
             | Expr
-    Expr    = ["(" AddExpr ")"]
+    Expr    = ["(" AddExpr ")"] 
             | %number
   `
   expect(math`3 / 4 / 5`).toEqual((3 / 4) / 5)
   expect(math`3/ (4 / 5)`).toEqual(3 / (4 / 5))
-  expect(math`1 + 2 * 3 - 4`).toEqual(1 + (2 * 3) - 4)
+  expect(math`1 
+    + 2 
+    * 3 
+    - 4`).toEqual(1 + (2 * 3) - 4)
   expect(math`2 ** 3 ** 2`).toEqual(2 ** (3 ** 2))
 }
 
@@ -272,4 +291,14 @@ export function test_lang_maybe (expect) {
   const trailingCommas = lang`%number ~"," %number ","? ${(a, b) => [a, b]}`
   expect(trailingCommas`1, 2`).toEqual([1, 2])
   expect(trailingCommas`1, 2,`).toEqual([1, 2])
+}
+
+export function test_lang_with_line_separators (expect) {
+  const lines = lang`%number+ / %line`
+  const text = lines`
+    1 2 
+  
+    3 4
+  `
+  expect(text).toEqual([[1, 2], [3, 4]])
 }

@@ -39,8 +39,10 @@ const trimQuotes = str => str.slice(1, -1)
 const toNumber = (str) => Number(str.replace(/_/g, ''))
 
 const basePatterns = {
-  whitespace: { type: () => 'ignore', match: /(?:\n|\s)+/, lineBreaks: true },
-  lineComment: { type: () => 'ignore', match: /#[^\n]*/ },
+  line: { type: () => 'line', match: /\n+/, lineBreaks: true },
+  whitespace: { type: () => 'ignore', match: /(?: |\t)+/ },
+  lineComment: { type: () => 'ignore', match: /\/\/[^\n]*/ },
+  blockComment: { type: () => 'ignore', match: /\/\*[^]*?\*\//, lineBreaks: true },
   dqstring: { type: () => 'string', match: /"(?:\\"|[^"])*"/, lineBreaks: true, value: trimQuotes },
   sqstring: { type: () => 'string', match: /'(?:\\'|[^'])*'/, lineBreaks: true, value: trimQuotes },
   decNumber: { type: () => 'number', match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/, value: toNumber },
@@ -71,5 +73,6 @@ export function createBasicTokenizer (literals) {
     while ((tok = next()) && tok.type === 'ignore') {}
     return tok
   })(lexer.next.bind(lexer))
+  // TODO: after removing comments, consolidate runs of %line into single %line
   return lexer
 }
