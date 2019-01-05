@@ -1,6 +1,5 @@
-import { nil, alt, seq, repeat, token as tok, lit, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
+import { MatchParser, nil, alt, seq, repeat, token as tok, lit, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
 import { tokenize } from './token-utils.mjs'
-import { MatchParser } from './parse-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
@@ -112,7 +111,9 @@ const compiler = createCompiler({
     if (!rules.length) { return seqi(ignoreLines) }
 
     const firstRuleID = rules[0][1]
-    return wrapIgnoreLines(ctx.scope[firstRuleID])
+    const out = wrapIgnoreLines(ctx.scope[firstRuleID])
+    out.scope = ctx.scope
+    return out
   },
   rule: (name, rule, ctx) => {
     ctx.scope[name] = ctx.eval(rule)
@@ -202,6 +203,7 @@ export function lang (strings, ...interpolations) {
     return parse(childParser, tokens)
   }
   childTTS.parse = (subject) => childParser.parse(subject)
+  childTTS.get = (key) => childParser.scope[key]
   return childTTS
 }
 
@@ -307,4 +309,16 @@ export function test_interpolated_parser (expect) {
   const num = lang`%number`
   const list = lang`${num}+`
   expect(list`1 2 3`).toEqual([1, 2, 3])
+}
+
+export function test_parser_lookup_rules (expect) {
+  const l = lang`
+    Number = %number
+    String = %string
+  `
+  const paren = (rule) => lang`["(" ${rule} ")"] | ${rule}`
+  const parenNumber = paren(l)
+  expect(parenNumber`(1)`).toEqual(1)
+  const parenString = paren(l.get('String'))
+  expect(parenString`("foo")`).toEqual('foo')
 }
