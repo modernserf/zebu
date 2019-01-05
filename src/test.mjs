@@ -6,10 +6,12 @@ import * as jsonExample from './examples/json'
 import * as typeExample from './examples/types'
 import * as propTypesExample from './examples/prop-types'
 import * as nondet from './nondet'
+import * as resumableErrors from './resumable-errors'
 
 const modules = [
   parseUtils, tokenUtils, visiblyPushdown, nondet,
   jsonExample, typeExample, propTypesExample,
+  resumableErrors,
 ]
 
 const expect = (value) => ({
