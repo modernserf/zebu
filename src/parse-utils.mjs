@@ -83,7 +83,7 @@ export function test_nil_matches_an_empty_sequence (expect) {
   }).toThrow()
 }
 
-class MatchParser {
+export class MatchParser {
   constructor (matchFn, err) {
     this.matchFn = matchFn
     this.err = err

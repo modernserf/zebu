@@ -1,5 +1,6 @@
 import { nil, alt, seq, repeat, token as tok, lit, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
 import { tokenize } from './token-utils.mjs'
+import { MatchParser } from './parse-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
@@ -30,12 +31,17 @@ const terminal = alt(
   seq(tag('token'), dlit('%'), token('identifier')),
   seq(tag('literal'), token('string'))
 )
+
+const isParser = new MatchParser((x) => x.value && x.value.parse)
+const mapFn = seqi(not(isParser), token('function'))
+
 const baseExpr = alt(
   wrappedWith(lit('('), () => expr, lit(')')),
   seq(tag('wrapped'), wrappedWith(
-    lit('['), () => seq(list, terminal, sepExpr, terminal, alt(token('function'), nil)), lit(']')
+    lit('['), () => seq(list, terminal, sepExpr, terminal, alt(mapFn, nil)), lit(']')
   )),
   seq(tag('identifier'), token('identifier')),
+  seq(tag('parser'), isParser),
   terminal,
 )
 // prefix and postfix operators, mutually exclusive
@@ -55,16 +61,16 @@ const sepExpr = alt(
 )
 const seqExpr = seq(
   tag('seq'),
-  repeat(sepExpr, 1), alt(seqi(ignoreLines, token('function')), nil)
+  repeat(sepExpr, 1), alt(seqi(ignoreLines, mapFn), nil)
 )
 
 const altExpr = seq(tag('alt'), sepBy(seqExpr, op('|')))
 // AddExpr = < . "+" MultExpr >
 const infixExpr = alt(
   seq(tag('leftInfix'),
-    dlit('<'), dlit('.'), repeat(sepExpr, 1), dlit('>'), token('function')),
+    dlit('<'), dlit('.'), repeat(sepExpr, 1), dlit('>'), mapFn),
   seq(tag('rightInfix'),
-    dlit('<'), repeat(sepExpr, 1), dlit('.'), dlit('>'), token('function')),
+    dlit('<'), repeat(sepExpr, 1), dlit('.'), dlit('>'), mapFn),
 )
 const expr = alt(
   seq(
@@ -168,6 +174,7 @@ const compiler = createCompiler({
     }
     return rule
   },
+  parser: (parser) => parser.value,
   token: compileTerminal(token),
   literal: compileTerminal(lit),
 })
@@ -194,6 +201,7 @@ export function lang (strings, ...interpolations) {
     const tokens = Array.from(tokenize(strings, interpolations))
     return parse(childParser, tokens)
   }
+  childTTS.parse = (subject) => childParser.parse(subject)
   return childTTS
 }
 
@@ -293,4 +301,10 @@ export function test_lang_with_line_separators (expect) {
     3 4
   `
   expect(text).toEqual([[1, 2], [3, 4]])
+}
+
+export function test_interpolated_parser (expect) {
+  const num = lang`%number`
+  const list = lang`${num}+`
+  expect(list`1 2 3`).toEqual([1, 2, 3])
 }
