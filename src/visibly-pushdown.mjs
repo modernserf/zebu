@@ -1,5 +1,5 @@
 import { nil, alt, seq, repeat, token as tok, lit, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
-import { createBasicTokenizer, tokenize, TOKENS_MACRO } from './token-utils.mjs'
+import { tokenize } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
@@ -185,24 +185,15 @@ function createCompiler (model) {
   }
 }
 
-const literals = [
-  '<', '>', '(', ')', '[', ']',
-  '.', '=', '|', '/', '*', '+', '?', '&', '!', '~', '%',
-]
-
 const rootParser = seq(compiler, program)
-const rootTokenizer = createBasicTokenizer(literals)
 
 export function lang (strings, ...interpolations) {
-  const tokens = Array.from(tokenize(rootTokenizer, strings, interpolations))
+  const tokens = Array.from(tokenize(strings, interpolations))
   const childParser = parse(rootParser, tokens)
-  const childLiterals = tokens.filter((t) => t.type === 'string').map((t) => t.value)
-  const childTokenizer = createBasicTokenizer(childLiterals)
   const childTTS = (strings, ...interpolations) => {
-    const tokens = Array.from(tokenize(childTokenizer, strings, interpolations))
+    const tokens = Array.from(tokenize(strings, interpolations))
     return parse(childParser, tokens)
   }
-  childTTS[TOKENS_MACRO] = tokens
   return childTTS
 }
 

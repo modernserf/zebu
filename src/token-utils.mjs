@@ -13,32 +13,10 @@ const mapInterpolations = value => ({
   interpolated: true,
 })
 
-export const TOKENS_MACRO = Symbol('TOKENS_MACRO')
-
-/**
- *
- * @param {Object} lexer
- * @param {[String]} strs
- * @param {[Object]} interpolations
- */
-export function * tokenize (lexer, strs, interpolations) {
-  for (const str of strs) {
-    yield * lexer.reset(str)
-    if (interpolations.length) {
-      let interp = interpolations.shift()
-      if (interp[TOKENS_MACRO]) {
-        yield * interp[TOKENS_MACRO]
-      } else {
-        yield mapInterpolations(interp)
-      }
-    }
-  }
-}
-
 const trimQuotes = str => str.slice(1, -1)
 const toNumber = (str) => Number(str.replace(/_/g, ''))
 
-const basePatterns = {
+const baseTokenizer = moo.compile({
   line: { type: () => 'line', match: /\n+/, lineBreaks: true },
   whitespace: { type: () => 'ignore', match: /(?: |\t)+/ },
   lineComment: { type: () => 'ignore', match: /\/\/[^\n]*/ },
@@ -50,27 +28,13 @@ const basePatterns = {
   octalNumber: { type: () => 'number', match: /0o[0-7_]+/, value: toNumber },
   binaryNumber: { type: () => 'number', match: /0b[0-1_]+/, value: toNumber },
   identifier: { match: /[$_A-Za-z][$_A-Za-z0-9]*/ },
-}
+  punctuation: { match: /[,;(){}[\]]/ },
+  operator: { match: /[!@#%^&*\-+=|/:<>.?/~]+/ },
+})
 
-function partition (xs, fn) {
-  const trues = []
-  const falses = []
-  for (const x of xs) {
-    if (fn(x)) { trues.push(x) } else { falses.push(x) }
-  }
-  return [trues, falses]
-}
-
-export function createBasicTokenizer (literals) {
-  const [keyword, token] = partition(literals, (x) => /^[$_A-Za-z]/.test(x))
-  const lexer = moo.compile({
-    ...basePatterns,
-    identifier: { ...basePatterns.identifier, keywords: moo.keywords({ keyword }) },
-    token,
-  })
-
+function withProcessedStream (tokenizer) {
   let consolidatingLines = false
-  lexer.next = filterIter(lexer.next.bind(lexer), (tok) => {
+  tokenizer.next = filterIter(tokenizer.next.bind(tokenizer), (tok) => {
     if (tok.type === 'ignore') { return false }
     if (tok.type === 'line') {
       if (consolidatingLines) { return false }
@@ -81,7 +45,23 @@ export function createBasicTokenizer (literals) {
       return true
     }
   })
-  return lexer
+  return tokenizer
+}
+
+const tokenizer = withProcessedStream(baseTokenizer)
+
+/**
+ * @param {[String]} strs
+ * @param {[Object]} interpolations
+ */
+export function * tokenize (strs, interpolations) {
+  for (const str of strs) {
+    yield * tokenizer.reset(str)
+    if (interpolations.length) {
+      let interp = interpolations.shift()
+      yield mapInterpolations(interp)
+    }
+  }
 }
 
 function filterIter (next, filterFn) {
