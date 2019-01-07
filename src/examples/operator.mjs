@@ -53,7 +53,7 @@ function compile (rules, _, rootParser) {
     const tokens = Array.from(tokenize(strings, interpolations))
     return parse(wrapped, tokens)
   }
-  // tts.parse = expr.parse
+  tts.parse = (subj) => expr.parse(subj)
 
   return tts
 }
@@ -79,4 +79,17 @@ export function test_operator_parser (expect) {
     * 3
     - 4`).toEqual(1 + (2 * 3) - 4)
   expect(math`2 ** 3 ** 2`).toEqual(2 ** (3 ** 2))
+}
+
+export function test_operator_parser_include (expect) {
+  const expr = lang`
+    Expr = include ${parent => op`
+      left "++" ${(xs, ys) => xs.concat(ys)}
+      root ${parent.RootExpr}
+    `}
+    RootExpr  = ["[" Expr / "," "]"]
+              | %string
+  `
+  expect(expr`["foo", "bar"] ++ ["baz"]`)
+    .toEqual(['foo', 'bar', 'baz'])
 }

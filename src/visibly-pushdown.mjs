@@ -39,6 +39,7 @@ const baseExpr = alt(
   seq(tag('wrapped'), wrappedWith(
     lit('['), () => seq(list, terminal, sepExpr, terminal, alt(mapFn, nil)), lit(']')
   )),
+  seq(tag('include'), dlit('include'), token('function')),
   seq(tag('identifier'), token('identifier')),
   seq(tag('parser'), isParser),
   terminal,
@@ -181,6 +182,7 @@ const compiler = createCompiler({
     }
     return rule
   },
+  include: (getParser, ctx) => getParser(ctx.scope),
   parser: (parser) => parser.value,
   token: compileTerminal(token),
   literal: compileTerminal(lit),
