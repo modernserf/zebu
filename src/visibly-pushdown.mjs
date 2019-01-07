@@ -1,4 +1,4 @@
-import { MatchParser, nil, alt, seq, repeat, token as tok, lit, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
+import { MatchParser, nil, alt, seq, repeat, token as tok, lit as literal, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
 import { tokenize } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -15,7 +15,8 @@ const id = (x) => x
 const list = (...xs) => xs
 const valueOf = (x) => x.value
 const seqi = (...xs) => seq(id, ...xs)
-const dlit = (x) => drop(lit(x))
+const lit = (str) => seq(valueOf, literal(str))
+const dlit = (x) => drop(literal(x))
 const token = (type) => seq(valueOf, tok(type))
 const tag = (type) => (...values) => [type, ...values]
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
@@ -292,7 +293,7 @@ export function test_lang_operator_precedence_assoc (expect) {
 }
 
 export function test_lookahead (expect) {
-  const optionalSemis = lang`(!";" ("+" | "*") ${(x) => x.value})+ ";"? ${(xs) => xs}`
+  const optionalSemis = lang`(!";" ("+" | "*"))+ ";"? ${(xs) => xs}`
   expect(optionalSemis`+ *`).toEqual(['+', '*'])
   expect(optionalSemis`+ * ;`).toEqual(['+', '*'])
 }

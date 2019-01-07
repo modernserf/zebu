@@ -12,7 +12,7 @@ const op = lang`
   AltExpr   = Expr / %line
   Expr      = Pattern %function ${(pattern, mapFn) => ({ pattern, mapFn })}
   Pattern   = %string+ ${(strs) => seqi(dline, ...strs.map(lit), dline)}
-  Fixity    = ("left" | "right" | "pre" | "post") ${({ value }) => value}
+  Fixity    = ("left" | "right" | "pre" | "post")
   RootRule  = ~"root" ${isParser} ${({ value }) => value}
 `
 
