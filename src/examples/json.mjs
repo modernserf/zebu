@@ -7,8 +7,8 @@ export const json = lang`
   Start = Expr
   Pair  = %string ~":" Expr ${(k, v) => [k, v]}
 
-  Expr  = [ "[" Expr / "," "]" ] ${(xs = []) => xs}
-        | [ "{" Pair / "," "}" ] ${fromPairs}
+  Expr  = [ "[" Expr /? "," "]" ] ${(xs = []) => xs}
+        | [ "{" Pair /? "," "}" ] ${fromPairs}
         | %number
         | %string
         | "true"  ${() => true}
@@ -22,6 +22,7 @@ export function test_json (expect) {
   expect(json` false `).toEqual(false)
   expect(json` 123.45 `).toEqual(123.45)
   expect(json` "foo" `).toEqual('foo')
+  expect(json`[]`).toEqual([])
   expect(json`[
     "foo", 
     "bar"

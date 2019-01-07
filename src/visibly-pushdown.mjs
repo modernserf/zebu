@@ -63,6 +63,7 @@ const preExpr = alt(
 
 // Expr / "," -> Expr, Expr, Expr ...
 const sepExpr = alt(
+  seq(tag('sepByMaybe'), preExpr, dlit('/?'), preExpr),
   seq(tag('sepBy'), preExpr, dlit('/'), preExpr),
   preExpr
 )
@@ -154,14 +155,19 @@ const compiler = createCompiler({
     right((p) => alt(seq(fn, ...xs.map(ctx.eval), p), ctx.eval(base))),
   alt: (xs, ctx) => alt(...xs.map(ctx.eval)),
   seq: (exprs, fn = id, ctx) => seq(fn, ...exprs.map(ctx.eval)),
+  sepByMaybe: (expr, sep, ctx) => {
+    sep = ctx.eval(sep)
+    return alt(sepBy(
+      ctx.eval(expr),
+      seqi(alt(sep, seqi(ignoreLines, sep)), ignoreLines)
+    ), seq(() => [], nil))
+  },
   sepBy: (expr, sep, ctx) => {
     sep = ctx.eval(sep)
-    return alt(
-      sepBy(
-        ctx.eval(expr),
-        seqi(alt(sep, seqi(ignoreLines, sep)), ignoreLines)
-      ),
-      nil)
+    return sepBy(
+      ctx.eval(expr),
+      seqi(alt(sep, seqi(ignoreLines, sep)), ignoreLines)
+    )
   },
   peek: (expr, ctx) => peek(ctx.eval(expr)),
   not: (expr, ctx) => not(ctx.eval(expr)),
