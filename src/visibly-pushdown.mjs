@@ -43,20 +43,26 @@ const baseExpr = alt(
   seq(tag('parser'), isParser),
   terminal,
 )
+
 // prefix and postfix operators, mutually exclusive
-const opExpr = alt(
-  seq(tag('peek'), dlit('&'), baseExpr),
-  seq(tag('not'), dlit('!'), baseExpr),
-  seq(tag('drop'), dlit('~'), baseExpr),
+const postExpr = alt(
   seq(tag('repeat0'), baseExpr, dlit('*')),
   seq(tag('repeat1'), baseExpr, dlit('+')),
   seq(tag('maybe'), baseExpr, dlit('?')),
   baseExpr
 )
+
+const preExpr = alt(
+  seq(tag('peek'), dlit('&'), postExpr),
+  seq(tag('not'), dlit('!'), postExpr),
+  seq(tag('drop'), dlit('~'), postExpr),
+  postExpr,
+)
+
 // Expr / "," -> Expr, Expr, Expr ...
 const sepExpr = alt(
-  seq(tag('sepBy'), opExpr, dlit('/'), opExpr),
-  opExpr
+  seq(tag('sepBy'), preExpr, dlit('/'), preExpr),
+  preExpr
 )
 const seqExpr = seq(
   tag('seq'),
@@ -260,16 +266,16 @@ export function test_lang_repeaters (expect) {
 
 export function test_lang_operator_precedence_assoc (expect) {
   const math = lang`
-    AddExpr = < . ~(%line?) ~"+" MulExpr >  ${(l, r) => l + r}
-            | < . ~(%line?) ~"-" MulExpr >  ${(l, r) => l - r}
+    AddExpr = < . ~ %line? ~"+" MulExpr >  ${(l, r) => l + r}
+            | < . ~ %line? ~"-" MulExpr >  ${(l, r) => l - r}
             | MulExpr
-    MulExpr = < . ~(%line?) ~"*" PowNeg >   ${(l, r) => l * r}
-            | < . ~(%line?) ~"/" PowNeg >   ${(l, r) => l / r}
+    MulExpr = < . ~ %line? ~"*" PowNeg >   ${(l, r) => l * r}
+            | < . ~ %line? ~"/" PowNeg >   ${(l, r) => l / r}
             | PowNeg
     PowNeg  = NegExpr 
             | PowExpr
     NegExpr = "-" Expr            ${(x) => -x}
-    PowExpr = < Expr ~(%line?) ~"**" . >    ${(l, r) => l ** r}
+    PowExpr = < Expr ~ %line? ~"**" . >    ${(l, r) => l ** r}
             | Expr
     Expr    = ["(" AddExpr ")"] 
             | %number
