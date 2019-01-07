@@ -58,7 +58,6 @@ function compile (rules, _, rootParser) {
   return tts
 }
 
-// TODO: comments need to work across interpolations
 export function test_operator_parser (expect) {
   const math = op`
     left  "+"  ${(l, r) => l + r}
