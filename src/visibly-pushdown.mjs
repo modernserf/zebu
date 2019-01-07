@@ -268,14 +268,14 @@ export function test_lang_operator_precedence_assoc (expect) {
             | PowNeg
     PowNeg  = NegExpr 
             | PowExpr
-    NegExpr = ~"-" Expr           ${(x) => -x}
+    NegExpr = "-" Expr            ${(x) => -x}
     PowExpr = < Expr ~"**" . >    ${(l, r) => l ** r}
             | Expr
     Expr    = ["(" AddExpr ")"] 
             | %number
   `
-  expect(math`3 / 4 / 5`).toEqual((3 / 4) / 5)
-  expect(math`3/ (4 / 5)`).toEqual(3 / (4 / 5))
+  expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
+  expect(math`3 * (4 / 5) * 6`).toEqual(3 * (4 / 5) * 6)
   expect(math`1 
     + 2 
     * 3 

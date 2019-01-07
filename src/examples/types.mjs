@@ -15,7 +15,7 @@ const t = lang`
   MulExpr = < . ~"*" NegExpr >  ${(l, r) => l * r}
           | < . ~"/" NegExpr >  ${(l, r) => l / r}
           | NegExpr
-  NegExpr = ~"-" NumExpr        ${(value) => -value}
+  NegExpr = < ~"-" . >          ${(value) => -value}
           | NumExpr
   NumExpr = ["(" AddExpr ")"]
           | %number
@@ -27,6 +27,7 @@ export function test_strings_can_concatenate (expect) {
 
 export function test_numbers_can_math (expect) {
   expect(t`10 * 20`).toEqual(200)
+  expect(t`- - -(10)`).toEqual(-10)
 }
 
 export function test_operations_dont_work_on_wrong_types (expect) {

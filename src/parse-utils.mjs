@@ -116,7 +116,7 @@ export function test_token_matches_a_type (expect) {
  */
 export const lit = (string) => new MatchParser(
   tok => tok.value === string && tok.type !== 'string',
-  ['did not match value', lit])
+  ['did not match value', string])
 
 export function test_lit_matches_values (expect) {
   const parser = lit('(')
@@ -198,6 +198,7 @@ class AltParser {
   parse (subject) {
     let errors = []
     for (const p of this.parsers) {
+      if (!p.parse) { console.warn('not a parser', [p], 'end') }
       const res = p.parse(subject)
       if (res.ok) { return res }
       errors.push(res.error)
