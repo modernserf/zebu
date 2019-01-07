@@ -126,7 +126,7 @@ const compiler = createCompiler({
     const seqs = []
     for (const [tTag, tSeq, tFn] of ts) {
       if (tTag !== hTag) { throw new MismatchedOperatorExpressionError(tag) }
-      seqs.push(seq(asInfixFn(tFn), ignoreLines, ...tSeq.map(ctx.eval)))
+      seqs.push(seq(asInfixFn(tFn), ...tSeq.map(ctx.eval)))
     }
     if (hTag === 'leftInfix') {
       return seq(
@@ -260,16 +260,16 @@ export function test_lang_repeaters (expect) {
 
 export function test_lang_operator_precedence_assoc (expect) {
   const math = lang`
-    AddExpr = < . ~"+" MulExpr >  ${(l, r) => l + r}
-            | < . ~"-" MulExpr >  ${(l, r) => l - r}
+    AddExpr = < . ~(%line?) ~"+" MulExpr >  ${(l, r) => l + r}
+            | < . ~(%line?) ~"-" MulExpr >  ${(l, r) => l - r}
             | MulExpr
-    MulExpr = < . ~"*" PowNeg >   ${(l, r) => l * r}
-            | < . ~"/" PowNeg >   ${(l, r) => l / r}
+    MulExpr = < . ~(%line?) ~"*" PowNeg >   ${(l, r) => l * r}
+            | < . ~(%line?) ~"/" PowNeg >   ${(l, r) => l / r}
             | PowNeg
     PowNeg  = NegExpr 
             | PowExpr
     NegExpr = "-" Expr            ${(x) => -x}
-    PowExpr = < Expr ~"**" . >    ${(l, r) => l ** r}
+    PowExpr = < Expr ~(%line?) ~"**" . >    ${(l, r) => l ** r}
             | Expr
     Expr    = ["(" AddExpr ")"] 
             | %number
