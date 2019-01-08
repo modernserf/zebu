@@ -1,4 +1,4 @@
-import { nil, alt, seq, repeat, token as tok, lit as literal, drop, wrappedWith, sepBy, left, right, parse } from './parse-utils.mjs'
+import { nil, alt, seq, repeat, token as tok, lit as literal, wrappedWith, sepBy, left, right, parse } from './parse-utils.mjs'
 import { tokenize } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -12,24 +12,28 @@ class WrapCtxError extends Error {
 }
 
 const id = (x) => x
+const _2 = (_, x) => x
 const list = (...xs) => xs
+const notNull = (x) => x !== null
 const valueOf = (x) => x.value
-const seqi = (...xs) => seq(id, ...xs)
+
 const lit = (str) => seq(valueOf, literal(str))
-const dlit = (x) => drop(literal(x))
 const token = (type) => seq(valueOf, tok(type))
-const tag = (type) => (...values) => [type, ...values]
+
+const drop = (p) => seq(() => null, p)
+const dlit = (x) => drop(literal(x))
+const tag = (type) => (...values) => [type, ...values.filter(notNull)]
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
 
 const line = token('line')
 const ignoreLines = drop(alt(line, nil))
-const wrapIgnoreLines = (parser) => seqi(ignoreLines, parser, ignoreLines)
+const wrapIgnoreLines = (parser) => seq(_2, ignoreLines, parser, ignoreLines)
 const op = (str) => wrapIgnoreLines(dlit(str))
 
 const terminal = seq(tag('literal'), token('value'))
 
-const mapFn = seqi(dlit(':'), token('value'))
+const mapFn = seq(_2, dlit(':'), token('value'))
 
 const baseExpr = alt(
   wrappedWith(lit('('), () => expr, lit(')')),
@@ -57,7 +61,7 @@ const sepExpr = alt(
 )
 const seqExpr = seq(
   tag('seq'),
-  repeat(sepExpr, 1), alt(seqi(ignoreLines, mapFn), nil)
+  repeat(sepExpr, 1), alt(seq(_2, ignoreLines, mapFn), nil)
 )
 
 const altExpr = seq(tag('alt'), sepBy(seqExpr, op('|')))
@@ -106,14 +110,13 @@ const baseScope = {
 }
 
 const compiler = createCompiler({
-  program: (rules = [], ctx) => {
+  program: (rules, ctx) => {
     ctx.scope = { ...baseScope }
     ctx.usedTerminals = {}
     // iterate through rules bottom-to-top
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
-    if (!rules.length) { return seqi(ignoreLines) }
 
     const firstRuleID = rules[0][1]
     const out = wrapIgnoreLines(ctx.scope[firstRuleID])
@@ -161,14 +164,14 @@ const compiler = createCompiler({
     sep = ctx.eval(sep)
     return alt(sepBy(
       ctx.eval(expr),
-      seqi(alt(sep, seqi(ignoreLines, sep)), ignoreLines)
+      seq(id, alt(sep, seq(_2, ignoreLines, sep)), ignoreLines)
     ), seq(() => [], nil))
   },
   sepBy: (expr, sep, ctx) => {
     sep = ctx.eval(sep)
     return sepBy(
       ctx.eval(expr),
-      seqi(alt(sep, seqi(ignoreLines, sep)), ignoreLines)
+      seq(id, alt(sep, seq(_2, ignoreLines, sep)), ignoreLines)
     )
   },
   repeat0: (expr, ctx) => repeat(ctx.eval(expr), 0),

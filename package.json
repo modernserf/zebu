@@ -23,8 +23,5 @@
     "faucet": "0.0.1",
     "prop-types": "^15.6.2",
     "rollup": "^0.67.3"
-  },
-  "dependencies": {
-    "moo": "^0.5.0"
   }
 }

@@ -1,4 +1,4 @@
-import moo from 'moo'
+import moo from './moo.mjs'
 
 const trimQuotes = str => str.slice(1, -1)
 const toNumber = (str) => Number(str.replace(/_/g, ''))
@@ -15,9 +15,9 @@ const baseTokenizer = moo.states({
     hexNumber: { type: () => 'value', match: /0x[0-9A-Fa-f_]+/, value: toNumber },
     octalNumber: { type: () => 'value', match: /0o[0-7_]+/, value: toNumber },
     binaryNumber: { type: () => 'value', match: /0b[0-1_]+/, value: toNumber },
-    identifier: { match: /[$_A-Za-z][$_A-Za-z0-9]*/ },
+    identifier: { match: /[$_\p{ID_Start}][$\p{ID_Continue}]*/ },
     punctuation: { match: /[,;(){}[\]]/ },
-    operator: { match: /[!@#%^&*\-+=|/:<>.?/~]+/ },
+    operator: { match: /[!@#%^&*\-+=|/:<>.?~]+/ },
   },
   lineComment: {
     body: { type: () => 'ignore', match: /[^\n]+/ },
