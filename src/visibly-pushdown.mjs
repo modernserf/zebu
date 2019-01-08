@@ -1,4 +1,4 @@
-import { nil, alt, seq, repeat, token as tok, lit as literal, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
+import { nil, alt, seq, repeat, token as tok, lit as literal, drop, wrappedWith, sepBy, left, right, parse } from './parse-utils.mjs'
 import { tokenize } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -49,18 +49,11 @@ const postExpr = alt(
   baseExpr
 )
 
-const preExpr = alt(
-  seq(tag('peek'), dlit('&'), postExpr),
-  seq(tag('not'), dlit('!'), postExpr),
-  seq(tag('drop'), dlit('~'), postExpr),
-  postExpr,
-)
-
 // Expr / "," -> Expr, Expr, Expr ...
 const sepExpr = alt(
-  seq(tag('sepByMaybe'), preExpr, dlit('**'), preExpr),
-  seq(tag('sepBy'), preExpr, dlit('++'), preExpr),
-  preExpr
+  seq(tag('sepByMaybe'), postExpr, dlit('**'), postExpr),
+  seq(tag('sepBy'), postExpr, dlit('++'), postExpr),
+  postExpr
 )
 const seqExpr = seq(
   tag('seq'),
@@ -83,15 +76,12 @@ const expr = alt(
   ),
   altExpr
 )
-const ruleHead = seqi(token('identifier'), dlit('='))
-const rule = seq(tag('rule'), ruleHead, expr)
-const notRuleHead = seqi(not(ruleHead), expr)
-const program = seq(tag('program'),
-  ignoreLines,
-  alt(notRuleHead, nil),
-  ignoreLines,
-  alt(sepBy(rule, line), nil),
-  ignoreLines
+const rule = seq(tag('rule'), token('identifier'), dlit('='), expr)
+
+const program = alt(
+  seq(tag('program'), wrapIgnoreLines(sepBy(rule, line))),
+  seq(tag('rootExpr'), wrapIgnoreLines(expr)),
+  seq(tag('nil'), wrapIgnoreLines(nil))
 )
 
 const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
@@ -116,14 +106,13 @@ const baseScope = {
 }
 
 const compiler = createCompiler({
-  program: (expr, rules = [], ctx) => {
+  program: (rules = [], ctx) => {
     ctx.scope = { ...baseScope }
     ctx.usedTerminals = {}
     // iterate through rules bottom-to-top
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
-    if (expr) { return wrapIgnoreLines(ctx.eval(expr)) }
     if (!rules.length) { return seqi(ignoreLines) }
 
     const firstRuleID = rules[0][1]
@@ -131,6 +120,12 @@ const compiler = createCompiler({
     out.scope = ctx.scope
     return out
   },
+  rootExpr: (expr, ctx) => {
+    ctx.scope = { ...baseScope }
+    ctx.usedTerminals = {}
+    return wrapIgnoreLines(ctx.eval(expr))
+  },
+  nil: () => wrapIgnoreLines(nil),
   rule: (name, rule, ctx) => {
     ctx.scope[name] = ctx.eval(rule)
   },
@@ -176,9 +171,6 @@ const compiler = createCompiler({
       seqi(alt(sep, seqi(ignoreLines, sep)), ignoreLines)
     )
   },
-  peek: (expr, ctx) => peek(ctx.eval(expr)),
-  not: (expr, ctx) => not(ctx.eval(expr)),
-  drop: (expr, ctx) => drop(ctx.eval(expr)),
   repeat0: (expr, ctx) => repeat(ctx.eval(expr), 0),
   repeat1: (expr, ctx) => repeat(ctx.eval(expr), 1),
   maybe: (expr, ctx) => alt(ctx.eval(expr), nil),
@@ -235,13 +227,13 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`~"(" value ")" : ${id}`
+  const num = lang`"(" value ")" : ${(_, x) => x}`
   expect(num`(123)`).toEqual(123)
 }
 
 export function test_lang_recursive_rules (expect) {
   const math = lang`
-    Neg   = ~"-" Expr     : ${(value) => -value}
+    Neg   = "-" Expr      : ${(_, value) => -value}
           | Expr
     Expr  = ["(" Neg ")"  : ${(_, x) => x}]
           | value
@@ -281,16 +273,16 @@ export function test_lang_repeaters (expect) {
 
 export function test_lang_operator_precedence_assoc (expect) {
   const math = lang`
-    AddExpr = < . ~line? ~"+" MulExpr > : ${(l, r) => l + r}
-            | < . ~line? ~"-" MulExpr > : ${(l, r) => l - r}
+    AddExpr = < . (line? "+") MulExpr > : ${(l, _, r) => l + r}
+            | < . (line? "-") MulExpr > : ${(l, _, r) => l - r}
             | MulExpr
-    MulExpr = < . ~line? ~"*" PowNeg >  : ${(l, r) => l * r}
-            | < . ~line? ~"/" PowNeg >  : ${(l, r) => l / r}
+    MulExpr = < . (line? "*") PowNeg >  : ${(l, _, r) => l * r}
+            | < . (line? "/") PowNeg >  : ${(l, _, r) => l / r}
             | PowNeg
     PowNeg  = NegExpr 
             | PowExpr
-    NegExpr = "-" Expr                  : ${(x) => -x}
-    PowExpr = < Expr ~line? ~"**" . >   : ${(l, r) => l ** r}
+    NegExpr = "-" Expr                  : ${(_, x) => -x}
+    PowExpr = < Expr (line? "**") . >   : ${(l, _, r) => l ** r}
             | Expr
     Expr    = ["(" AddExpr ")"] 
             | value
@@ -304,14 +296,8 @@ export function test_lang_operator_precedence_assoc (expect) {
   expect(math`2 ** 3 ** 2`).toEqual(2 ** (3 ** 2))
 }
 
-export function test_lookahead (expect) {
-  const optionalSemis = lang`(!";" ("+" | "*"))+ ";"? : ${(xs) => xs}`
-  expect(optionalSemis`+ *`).toEqual(['+', '*'])
-  expect(optionalSemis`+ * ;`).toEqual(['+', '*'])
-}
-
 export function test_lang_maybe (expect) {
-  const trailingCommas = lang`value ~"," value ","? : ${(a, b) => [a, b]}`
+  const trailingCommas = lang`value "," value ","? : ${(a, _, b) => [a, b]}`
   expect(trailingCommas`1, 2`).toEqual([1, 2])
   expect(trailingCommas`1, 2,`).toEqual([1, 2])
 }

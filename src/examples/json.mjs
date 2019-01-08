@@ -5,7 +5,7 @@ const fromPairs = (pairs = []) =>
 
 export const json = lang`
   Start = Expr
-  Pair  = value ~":" Expr         : ${(k, v) => [k, v]}
+  Pair  = value ":" Expr          : ${(k, _, v) => [k, v]}
 
   Expr  = [ "[" Expr ** "," "]" ] : ${(xs = []) => xs}
         | [ "{" Pair ** "," "}" ] : ${fromPairs}

@@ -9,10 +9,10 @@ const op = lang`
   Program   = (Rule ** line) line? RootRule : ${compile}
   Rule      = Fixity AltExpr                : ${(fixity, operators) => [fixity, operators]}
   AltExpr   = Expr ++ line
-  Expr      = Pattern ~":" value            : ${(pattern, mapFn) => ({ pattern, mapFn })}
+  Expr      = Pattern ":" value             : ${(pattern, _, mapFn) => ({ pattern, mapFn })}
   Pattern   = value+                        : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
   Fixity    = ("left" | "right" | "pre" | "post")
-  RootRule  = ~"root" value
+  RootRule  = "root" value                  : ${(_, value) => value}
 `
 
 const applyLeft = (first, rest) => rest.reduce((l, fn) => fn(l), first)

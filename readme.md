@@ -101,7 +101,8 @@ TODO: example grammar. probably the `lang` grammar itself
 
 ```js
 lang`
-  Language  = Expr | Rule ** (line | ";")
+  Language  = Rule ** (line | ";")
+            | Expr
   Rule      = identifier "=" Expr
   Expr      = (Infix ++ "|") line? "|" AltExpr
             | AltExpr
@@ -109,8 +110,8 @@ lang`
             | "<" SepExpr+ "." ">" MapFunc
   AltExpr   = SeqExpr ++ "|"
   SeqExpr   = SepExpr+ MapFunc?
-  SepExpr   = PreExpr (("**" | "++") PeekExpr)?
-  PeekExpr  = ("~" | "!" | "&" | nil) RepExpr
+  SepExpr   = RepExpr ("**" | "++") RepExpr
+            | RepExpr
   RepExpr   = BaseExpr ("*" | "+" | "?" | nil)
   BaseExpr  = ["(" Expr ")"]
             | ["[" (value Expr value MapFunc?) "]"]
