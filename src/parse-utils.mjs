@@ -114,9 +114,9 @@ export function test_token_matches_a_type (expect) {
  * matches if token.value === string, and token is not itself a string.
  * @param {string} string
  */
-export const lit = (string) => new MatchParser(
-  tok => tok.value === string && tok.type !== 'string',
-  ['did not match value', string])
+export const lit = (value) => new MatchParser(
+  tok => tok.value === value && tok.type !== 'value',
+  ['did not match value', value])
 
 export function test_lit_matches_values (expect) {
   const parser = lit('(')

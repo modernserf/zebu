@@ -5,16 +5,14 @@ const fromPairs = (pairs = []) =>
 
 export const json = lang`
   Start = Expr
-  Pair  = %string ~":" Expr ${(k, v) => [k, v]}
+  Pair  = %value ~":" Expr        : ${(k, v) => [k, v]}
 
-  Expr  = [ "[" Expr /? "," "]" ] ${(xs = []) => xs}
-        | [ "{" Pair /? "," "}" ] ${fromPairs}
-        | %number
-        | %string
-        | "true"  ${() => true}
-        | "false" ${() => false}
-        | "null"  
-          ${() => null}
+  Expr  = [ "[" Expr /? "," "]" ] : ${(xs = []) => xs}
+        | [ "{" Pair /? "," "}" ] : ${fromPairs}
+        | %value
+        | "true"  : ${() => true}
+        | "false" : ${() => false}
+        | "null"  : ${() => null}
 `
 
 export function test_json (expect) {
@@ -24,7 +22,7 @@ export function test_json (expect) {
   expect(json` "foo" `).toEqual('foo')
   expect(json`[]`).toEqual([])
   expect(json`[
-    "foo", 
+    "foo",
     "bar"
   ]`).toEqual(['foo', 'bar'])
   expect(json`{"x": {"y": {}}}`).toEqual({ x: { y: {} } })

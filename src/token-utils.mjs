@@ -1,14 +1,7 @@
 import moo from 'moo'
 
-function smartTypeOf (value) {
-  if (typeof value === 'object' && !value) {
-    return 'null'
-  }
-  return typeof value
-}
-
 const mapInterpolations = value => ({
-  type: smartTypeOf(value),
+  type: 'value',
   value,
   interpolated: true,
 })
@@ -22,12 +15,12 @@ const baseTokenizer = moo.states({
     whitespace: { type: () => 'ignore', match: /(?: |\t)+/ },
     lineComment: { type: () => 'ignore', match: '//', next: 'lineComment' },
     blockComment: { type: () => 'ignore', match: '/*', next: 'blockComment' },
-    dqstring: { type: () => 'string', match: /"(?:\\"|[^"])*"/, lineBreaks: true, value: trimQuotes },
-    sqstring: { type: () => 'string', match: /'(?:\\'|[^'])*'/, lineBreaks: true, value: trimQuotes },
-    decNumber: { type: () => 'number', match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/, value: toNumber },
-    hexNumber: { type: () => 'number', match: /0x[0-9A-Fa-f_]+/, value: toNumber },
-    octalNumber: { type: () => 'number', match: /0o[0-7_]+/, value: toNumber },
-    binaryNumber: { type: () => 'number', match: /0b[0-1_]+/, value: toNumber },
+    dqstring: { type: () => 'value', match: /"(?:\\"|[^"])*"/, lineBreaks: true, value: trimQuotes },
+    sqstring: { type: () => 'value', match: /'(?:\\'|[^'])*'/, lineBreaks: true, value: trimQuotes },
+    decNumber: { type: () => 'value', match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/, value: toNumber },
+    hexNumber: { type: () => 'value', match: /0x[0-9A-Fa-f_]+/, value: toNumber },
+    octalNumber: { type: () => 'value', match: /0o[0-7_]+/, value: toNumber },
+    binaryNumber: { type: () => 'value', match: /0b[0-1_]+/, value: toNumber },
     identifier: { match: /[$_A-Za-z][$_A-Za-z0-9]*/ },
     punctuation: { match: /[,;(){}[\]]/ },
     operator: { match: /[!@#%^&*\-+=|/:<>.?/~]+/ },

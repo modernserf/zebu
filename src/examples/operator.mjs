@@ -7,13 +7,13 @@ const seqi = (...ps) => seq((x) => x, ...ps)
 const dline = drop(alt(token('line'), nil))
 
 const op = lang`
-  Program   = (Rule / %line) %line? RootRule ${compile}
-  Rule      = Fixity AltExpr ${(fixity, operators) => [fixity, operators]}
+  Program   = (Rule / %line) %line? RootRule  : ${compile}
+  Rule      = Fixity AltExpr                  : ${(fixity, operators) => [fixity, operators]}
   AltExpr   = Expr / %line
-  Expr      = Pattern %function ${(pattern, mapFn) => ({ pattern, mapFn })}
-  Pattern   = %string+ ${(strs) => seqi(dline, ...strs.map(lit), dline)}
+  Expr      = Pattern ~":" %value             : ${(pattern, mapFn) => ({ pattern, mapFn })}
+  Pattern   = %value+                         : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
   Fixity    = ("left" | "right" | "pre" | "post")
-  RootRule  = ~"root" ${isParser} ${({ value }) => value}
+  RootRule  = ~"root" ${isParser}             : ${({ value }) => value}
 `
 
 const applyLeft = (first, rest) => rest.reduce((l, fn) => fn(l), first)
@@ -60,16 +60,16 @@ function compile (rules, _, rootParser) {
 
 export function test_operator_parser (expect) {
   const math = op`
-    left  "+"  ${(l, r) => l + r}
-          "-"  ${(l, r) => l - r}
-    left  "*"  ${(l, r) => l * r}
-          "/"  ${(l, r) => l / r}
-          "%"  ${(l, r) => l % r}
-    right "**" ${(l, r) => l ** r}
-    pre   "-"  ${x => -x}
-    post  "++" ${x => x + 1}
-          "--" ${x => x - 1}
-    root  ${seq((x) => x.value, token('number'))}
+    left  "+"   : ${(l, r) => l + r}
+          "-"   : ${(l, r) => l - r}
+    left  "*"   : ${(l, r) => l * r}
+          "/"   : ${(l, r) => l / r}
+          "%"   : ${(l, r) => l % r}
+    right "**"  : ${(l, r) => l ** r}
+    pre   "-"   : ${x => -x}
+    post  "++"  : ${x => x + 1}
+          "--"  : ${x => x - 1}
+    root  ${seq((x) => x.value, token('value'))}
   `
   expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
   expect(math`3 * (4 / 5) * 6`).toEqual(3 * (4 / 5) * 6)
@@ -84,11 +84,11 @@ export function test_operator_parser (expect) {
 export function test_operator_parser_include (expect) {
   const expr = lang`
     Expr = include ${parent => op`
-      left "++" ${(xs, ys) => xs.concat(ys)}
+      left "++" : ${(xs, ys) => xs.concat(ys)}
       root ${parent.RootExpr}
     `}
     RootExpr  = ["[" Expr / "," "]"]
-              | %string
+              | %value
   `
   expect(expr`["foo", "bar"] ++ ["baz"]`)
     .toEqual(['foo', 'bar', 'baz'])
