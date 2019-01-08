@@ -82,7 +82,7 @@ const url = text`
   Anchor    = Component
   Component = ${/[A-Za-z0-9()_\-~]/}    ${decodeURIComponent}
 `
-url.match("https://github.com/modernserf/little-language-lab?foo=bar%20baz"/)
+url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
 /* => { 
   ok: true, 
   value: {
@@ -101,11 +101,11 @@ TODO: example grammar. probably the `lang` grammar itself
 
 ```js
 lang`
-  Language  = Expr | Rule ** (%line | ";")
-  Rule      = %identifier "=" Expr
-  Expr      = (OpExpr ++ "|") %line? "|" AltExpr
+  Language  = Expr | Rule ** (line | ";")
+  Rule      = identifier "=" Expr
+  Expr      = (Infix ++ "|") line? "|" AltExpr
             | AltExpr
-  OpExpr    = "<" "." SepExpr+ ">" MapFunc
+  Infix     = "<" "." SepExpr+ ">" MapFunc
             | "<" SepExpr+ "." ">" MapFunc
   AltExpr   = SeqExpr ++ "|"
   SeqExpr   = SepExpr+ MapFunc?
@@ -113,13 +113,11 @@ lang`
   PeekExpr  = ("~" | "!" | "&" | nil) RepExpr
   RepExpr   = BaseExpr ("*" | "+" | "?" | nil)
   BaseExpr  = ["(" Expr ")"]
-            | ["[" (%value Expr %value MapFunc?) "]"]
-            | "include" %value
-            | "%" %identifier
-            | %identifier
-            | %value
-            | "nil"
-  MapFunc   = %line? ":" %value
+            | ["[" (value Expr value MapFunc?) "]"]
+            | "include" value
+            | identifier
+            | value
+  MapFunc   = line? ":" value
 `
 ```
 
@@ -134,8 +132,8 @@ TODO: show how text is tokenized, including removed whitespace, comments, joined
 
 TODO: examples, three columns: grammar on left, example text in middle, parse tree on right
 
-`%line` - match a linebreak.
-`%value` - match a literal value -- a number or a quoted string -- or an interpolated value
-`%identifier` - match a
+`line` - match a linebreak.
+`value` - match a literal value -- a number or a quoted string -- or an interpolated value
+`identifier` - match a
 `"include"` `"="` - match a token with this text
 `

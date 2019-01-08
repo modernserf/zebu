@@ -27,7 +27,6 @@ const ignoreLines = drop(alt(line, nil))
 const wrapIgnoreLines = (parser) => seqi(ignoreLines, parser, ignoreLines)
 const op = (str) => wrapIgnoreLines(dlit(str))
 
-const ident = seq(tag('token'), dlit('%'), token('identifier'))
 const terminal = seq(tag('literal'), token('value'))
 
 const mapFn = seqi(dlit(':'), token('value'))
@@ -39,7 +38,6 @@ const baseExpr = alt(
   )),
   seq(tag('include'), dlit('include'), token('value')),
   seq(tag('identifier'), token('identifier')),
-  ident,
   terminal
 )
 
@@ -109,9 +107,17 @@ const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
   return parser(value)
 }
 
+const baseScope = {
+  line: token('line'),
+  value: token('value'),
+  identifier: token('identifier'),
+  operator: token('operator'),
+  nil: nil,
+}
+
 const compiler = createCompiler({
   program: (expr, rules = [], ctx) => {
-    ctx.scope = {}
+    ctx.scope = { ...baseScope }
     ctx.usedTerminals = {}
     // iterate through rules bottom-to-top
     for (let i = rules.length - 1; i >= 0; i--) {
@@ -229,7 +235,7 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`~"(" %value ")" : ${id}`
+  const num = lang`~"(" value ")" : ${id}`
   expect(num`(123)`).toEqual(123)
 }
 
@@ -238,7 +244,7 @@ export function test_lang_recursive_rules (expect) {
     Neg   = ~"-" Expr     : ${(value) => -value}
           | Expr
     Expr  = ["(" Neg ")"  : ${(_, x) => x}]
-          | %value
+          | value
   `
   expect(math`123`).toEqual(123)
   expect(math`-123`).toEqual(-123)
@@ -247,7 +253,7 @@ export function test_lang_recursive_rules (expect) {
 }
 
 export function test_lang_recursive_rule_errors (expect) {
-  expect(() => { lang`Rule = ["( %value "("]` }).toThrow()
+  expect(() => { lang`Rule = ["( value "("]` }).toThrow()
   expect(() => {
     lang`
       Root = ["( Value ")"]
@@ -259,14 +265,14 @@ export function test_lang_recursive_rule_errors (expect) {
 export function test_lang_repeaters (expect) {
   const list = lang`
     Expr  = ["(" Expr* ")"]
-          | %identifier
+          | identifier
   `
   expect(list`(foo bar (baz quux) xyzzy)`)
     .toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
   const nonEmptyList = lang`
     Expr  = ["(" Expr+ ")"]
-          | %identifier
+          | identifier
   `
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`)
     .toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
@@ -275,19 +281,19 @@ export function test_lang_repeaters (expect) {
 
 export function test_lang_operator_precedence_assoc (expect) {
   const math = lang`
-    AddExpr = < . ~ %line? ~"+" MulExpr > : ${(l, r) => l + r}
-            | < . ~ %line? ~"-" MulExpr > : ${(l, r) => l - r}
+    AddExpr = < . ~line? ~"+" MulExpr > : ${(l, r) => l + r}
+            | < . ~line? ~"-" MulExpr > : ${(l, r) => l - r}
             | MulExpr
-    MulExpr = < . ~ %line? ~"*" PowNeg >  : ${(l, r) => l * r}
-            | < . ~ %line? ~"/" PowNeg >  : ${(l, r) => l / r}
+    MulExpr = < . ~line? ~"*" PowNeg >  : ${(l, r) => l * r}
+            | < . ~line? ~"/" PowNeg >  : ${(l, r) => l / r}
             | PowNeg
     PowNeg  = NegExpr 
             | PowExpr
-    NegExpr = "-" Expr                    : ${(x) => -x}
-    PowExpr = < Expr ~ %line? ~"**" . >   : ${(l, r) => l ** r}
+    NegExpr = "-" Expr                  : ${(x) => -x}
+    PowExpr = < Expr ~line? ~"**" . >   : ${(l, r) => l ** r}
             | Expr
     Expr    = ["(" AddExpr ")"] 
-            | %value
+            | value
   `
   expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
   expect(math`3 * (4 / 5) * 6`).toEqual(3 * (4 / 5) * 6)
@@ -305,13 +311,13 @@ export function test_lookahead (expect) {
 }
 
 export function test_lang_maybe (expect) {
-  const trailingCommas = lang`%value ~"," %value ","? : ${(a, b) => [a, b]}`
+  const trailingCommas = lang`value ~"," value ","? : ${(a, b) => [a, b]}`
   expect(trailingCommas`1, 2`).toEqual([1, 2])
   expect(trailingCommas`1, 2,`).toEqual([1, 2])
 }
 
 export function test_lang_with_line_separators (expect) {
-  const lines = lang`%value+ ++ %line`
+  const lines = lang`value+ ++ line`
   const text = lines`
     1 2 
   
@@ -321,14 +327,14 @@ export function test_lang_with_line_separators (expect) {
 }
 
 export function test_interpolated_parser (expect) {
-  const num = lang`%value`
+  const num = lang`value`
   const list = lang`${num}+`
   expect(list`1 2 3`).toEqual([1, 2, 3])
 }
 
 export function test_parser_lookup_rules (expect) {
   const l = lang`
-    Number = %value
+    Number = value
     Keyword = "foo"
   `
   const paren = (rule) => lang`["(" ${rule} ")"] | ${rule}`

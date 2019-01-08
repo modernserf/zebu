@@ -6,13 +6,13 @@ const seqi = (...ps) => seq((x) => x, ...ps)
 const dline = drop(alt(token('line'), nil))
 
 const op = lang`
-  Program   = (Rule ** %line) %line? RootRule : ${compile}
-  Rule      = Fixity AltExpr                  : ${(fixity, operators) => [fixity, operators]}
-  AltExpr   = Expr ++ %line
-  Expr      = Pattern ~":" %value             : ${(pattern, mapFn) => ({ pattern, mapFn })}
-  Pattern   = %value+                         : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
+  Program   = (Rule ** line) line? RootRule : ${compile}
+  Rule      = Fixity AltExpr                : ${(fixity, operators) => [fixity, operators]}
+  AltExpr   = Expr ++ line
+  Expr      = Pattern ~":" value            : ${(pattern, mapFn) => ({ pattern, mapFn })}
+  Pattern   = value+                        : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
   Fixity    = ("left" | "right" | "pre" | "post")
-  RootRule  = ~"root" %value
+  RootRule  = ~"root" value
 `
 
 const applyLeft = (first, rest) => rest.reduce((l, fn) => fn(l), first)
@@ -87,7 +87,7 @@ export function test_operator_parser_include (expect) {
       root ${parent.RootExpr}
     `}
     RootExpr  = ["[" Expr ** "," "]"]
-              | %value
+              | value
   `
   expect(expr`["foo", "bar"] ++ ["baz"]`)
     .toEqual(['foo', 'bar', 'baz'])
