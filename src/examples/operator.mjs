@@ -6,9 +6,9 @@ const seqi = (...ps) => seq((x) => x, ...ps)
 const dline = drop(alt(token('line'), nil))
 
 const op = lang`
-  Program   = (Rule / %line) %line? RootRule  : ${compile}
+  Program   = (Rule ** %line) %line? RootRule : ${compile}
   Rule      = Fixity AltExpr                  : ${(fixity, operators) => [fixity, operators]}
-  AltExpr   = Expr / %line
+  AltExpr   = Expr ++ %line
   Expr      = Pattern ~":" %value             : ${(pattern, mapFn) => ({ pattern, mapFn })}
   Pattern   = %value+                         : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
   Fixity    = ("left" | "right" | "pre" | "post")
@@ -86,7 +86,7 @@ export function test_operator_parser_include (expect) {
       left "++" : ${(xs, ys) => xs.concat(ys)}
       root ${parent.RootExpr}
     `}
-    RootExpr  = ["[" Expr / "," "]"]
+    RootExpr  = ["[" Expr ** "," "]"]
               | %value
   `
   expect(expr`["foo", "bar"] ++ ["baz"]`)

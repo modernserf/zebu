@@ -31,7 +31,7 @@ export const range = lang`
             | Range
 
   Range = Start ~"..." End      : ${doRange}
-        | %value / ","
+        | %value ++ ","
 
   Start = ExcludeValue ~"," %value  : ${interval(true)}
         | %value ~"," %value        : ${interval(false)}

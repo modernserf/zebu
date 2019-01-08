@@ -6,18 +6,18 @@ const fromPairs = (pairs) => pairs.reduce(Object.assign, {})
 const ifMultiple = (fn) => (xs) => xs.length === 1 ? xs[0] : fn(xs)
 
 export const propTypes = lang`
-  Rules     = Rule / (%line | ";")  : ${fromPairs}
+  Rules     = Rule ** (%line | ";") : ${fromPairs}
   Rule      = %identifier ~":" Expr : ${pair}
 
   Pair      = Key ~":" Expr         : ${pair}
   Key       = %identifier | %value
 
-  Expr      = OptExpr / "|"         : ${ifMultiple(PropTypes.oneOfType)}
+  Expr      = OptExpr ++ "|"        : ${ifMultiple(PropTypes.oneOfType)}
   OptExpr   = BaseExpr "?"            // proptypes are optional by default
             | BaseExpr              : ${(type) => type.isRequired}
   BaseExpr  = ["(" Expr ")"]
             | ["{" (~":" Expr) "}"] : ${PropTypes.objectOf}
-            | ["{" Pair / "," "}"]  : ${(pairs) => PropTypes.shape(fromPairs(pairs))}
+            | ["{" Pair ** "," "}"] : ${(pairs) => PropTypes.shape(fromPairs(pairs))}
             | ["[" Expr "]"]        : ${PropTypes.arrayOf}
             | "instanceof" %value   : ${PropTypes.instanceOf}
             | %identifier           : ${(id) => PropTypes[id]}

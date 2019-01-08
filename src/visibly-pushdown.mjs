@@ -60,8 +60,8 @@ const preExpr = alt(
 
 // Expr / "," -> Expr, Expr, Expr ...
 const sepExpr = alt(
-  seq(tag('sepByMaybe'), preExpr, dlit('/?'), preExpr),
-  seq(tag('sepBy'), preExpr, dlit('/'), preExpr),
+  seq(tag('sepByMaybe'), preExpr, dlit('**'), preExpr),
+  seq(tag('sepBy'), preExpr, dlit('++'), preExpr),
   preExpr
 )
 const seqExpr = seq(
@@ -311,7 +311,7 @@ export function test_lang_maybe (expect) {
 }
 
 export function test_lang_with_line_separators (expect) {
-  const lines = lang`%value+ / %line`
+  const lines = lang`%value+ ++ %line`
   const text = lines`
     1 2 
   
