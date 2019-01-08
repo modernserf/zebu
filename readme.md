@@ -2,7 +2,7 @@
 
 ## What is this?
 
-LLL is JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) that use [tagged template strings](http://2ality.com/2016/11/computing-tag-functions.html).
+LLL is JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) that use [tagged template literals](http://2ality.com/2016/11/computing-tag-functions.html).
 
 ## Little Languages built with LLL
 
@@ -94,3 +94,48 @@ url.match("https://github.com/modernserf/little-language-lab?foo=bar%20baz"/)
   },
 } */
 ```
+
+## Writing a language
+
+TODO: example grammar. probably the `lang` grammar itself
+
+```js
+lang`
+  Language  = Expr | Rule ** (%line | ";")
+  Rule      = %identifier "=" Expr
+  Expr      = (OpExpr ++ "|") %line? "|" AltExpr
+            | AltExpr
+  OpExpr    = "<" "." SepExpr+ ">" MapFunc
+            | "<" SepExpr+ "." ">" MapFunc
+  AltExpr   = SeqExpr ++ "|"
+  SeqExpr   = SepExpr+ MapFunc?
+  SepExpr   = PreExpr (("**" | "++") PeekExpr)?
+  PeekExpr  = ("~" | "!" | "&" | nil) RepExpr
+  RepExpr   = BaseExpr ("*" | "+" | "?" | nil)
+  BaseExpr  = ["(" Expr ")"]
+            | ["[" (%value Expr %value MapFunc?) "]"]
+            | "include" %value
+            | "%" %identifier
+            | %identifier
+            | %value
+            | "nil"
+  MapFunc   = %line? ":" %value
+`
+```
+
+### Vocabulary
+TODO: adapt vocabulary section from nearley https://nearley.js.org/docs/grammar
+
+### Tokenizing
+
+TODO: show how text is tokenized, including removed whitespace, comments, joined operators. emphasize that tokenization is same between the definition language & the generated language
+
+### Parsing
+
+TODO: examples, three columns: grammar on left, example text in middle, parse tree on right
+
+`%line` - match a linebreak.
+`%value` - match a literal value -- a number or a quoted string -- or an interpolated value
+`%identifier` - match a
+`"include"` `"="` - match a token with this text
+`
