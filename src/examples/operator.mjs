@@ -1,8 +1,7 @@
 import { lang } from '../index'
-import { MatchParser, nil, lit, seq, alt, drop, repeat, wrappedWith, parse, token } from '../parse-utils'
+import { nil, lit, seq, alt, drop, repeat, wrappedWith, parse, token } from '../parse-utils'
 import { tokenize } from '../token-utils'
 
-const isParser = new MatchParser((x) => x && x.value && x.value.parse)
 const seqi = (...ps) => seq((x) => x, ...ps)
 const dline = drop(alt(token('line'), nil))
 
@@ -13,7 +12,7 @@ const op = lang`
   Expr      = Pattern ~":" %value             : ${(pattern, mapFn) => ({ pattern, mapFn })}
   Pattern   = %value+                         : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
   Fixity    = ("left" | "right" | "pre" | "post")
-  RootRule  = ~"root" ${isParser}             : ${({ value }) => value}
+  RootRule  = ~"root" %value
 `
 
 const applyLeft = (first, rest) => rest.reduce((l, fn) => fn(l), first)

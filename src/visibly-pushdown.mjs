@@ -1,4 +1,4 @@
-import { MatchParser, nil, alt, seq, repeat, token as tok, lit as literal, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
+import { nil, alt, seq, repeat, token as tok, lit as literal, drop, not, wrappedWith, peek, sepBy, left, right, parse } from './parse-utils.mjs'
 import { tokenize } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -32,7 +32,6 @@ const terminal = alt(
   seq(tag('literal'), token('value'))
 )
 
-const isParser = new MatchParser((x) => x.value && x.value.parse)
 const mapFn = seqi(dlit(':'), token('value'))
 
 const baseExpr = alt(
@@ -42,7 +41,6 @@ const baseExpr = alt(
   )),
   seq(tag('include'), dlit('include'), token('value')),
   seq(tag('identifier'), token('identifier')),
-  seq(tag('parser'), isParser),
   terminal,
 )
 
@@ -100,6 +98,10 @@ const program = seq(tag('program'),
 )
 
 const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
+  if (value && value.parse) {
+    return value
+  }
+
   if (ctx.usedTerminals[value] &&
     ctx.usedTerminals[value] !== wrapCtx) {
     throw new WrapCtxError(value, wrapCtx, ctx.usedTerminals[value])
@@ -190,7 +192,6 @@ const compiler = createCompiler({
     return rule
   },
   include: (getParser, ctx) => getParser(ctx.scope),
-  parser: (parser) => parser.value,
   token: compileTerminal(token),
   literal: compileTerminal(lit),
 })
