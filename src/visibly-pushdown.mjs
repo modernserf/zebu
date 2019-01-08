@@ -27,10 +27,8 @@ const ignoreLines = drop(alt(line, nil))
 const wrapIgnoreLines = (parser) => seqi(ignoreLines, parser, ignoreLines)
 const op = (str) => wrapIgnoreLines(dlit(str))
 
-const terminal = alt(
-  seq(tag('token'), dlit('%'), token('identifier')),
-  seq(tag('literal'), token('value'))
-)
+const ident = seq(tag('token'), dlit('%'), token('identifier'))
+const terminal = seq(tag('literal'), token('value'))
 
 const mapFn = seqi(dlit(':'), token('value'))
 
@@ -41,7 +39,8 @@ const baseExpr = alt(
   )),
   seq(tag('include'), dlit('include'), token('value')),
   seq(tag('identifier'), token('identifier')),
-  terminal,
+  ident,
+  terminal
 )
 
 // prefix and postfix operators, mutually exclusive
