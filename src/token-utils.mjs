@@ -1,11 +1,5 @@
 import moo from 'moo'
 
-const mapInterpolations = value => ({
-  type: 'value',
-  value,
-  interpolated: true,
-})
-
 const trimQuotes = str => str.slice(1, -1)
 const toNumber = (str) => Number(str.replace(/_/g, ''))
 
@@ -65,10 +59,10 @@ export function * tokenize (strs, interpolations) {
     yield * tokenizer.reset(str, lastState)
     lastState = tokenizer.save()
     if (interpolations.length) {
-      let interp = interpolations.shift()
-      // don't yield interpolated values
+      let value = interpolations.shift()
+      // don't yield interpolated values in comments
       if (lastState.state === 'main') {
-        yield mapInterpolations(interp)
+        yield { type: 'value', value }
       }
     }
   }
