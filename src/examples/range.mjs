@@ -26,19 +26,18 @@ function * doRange (
 }
 
 export const range = lang`
-  OpenRange = < Range ~"," . > ${function * (l, r) { yield * l; yield * r }}
-            | Start ~"..." ${doRange}
+  OpenRange = < Range ~"," . >  : ${function * (l, r) { yield * l; yield * r }}
+            | Start ~"..."      : ${doRange}
             | Range
 
-  Range = Start ~"..." End ${doRange}
-        | Value / ","
+  Range = Start ~"..." End      : ${doRange}
+        | %value / ","
 
-  Start = ExcludeValue ~"," Value ${interval(true)}
-        | Value ~"," Value ${interval(false)}
-        | Value ${(value) => ({ value, exclude: false })} 
-  End   = ExcludeValue ${(value) => ({ value, exclude: true })}
-        | %number ${(value) => ({ value, exclude: false })}
+  Start = ExcludeValue ~"," %value  : ${interval(true)}
+        | %value ~"," %value        : ${interval(false)}
+        | %value                    : ${(value) => ({ value, exclude: false })} 
+  End   = ExcludeValue              : ${(value) => ({ value, exclude: true })}
+        | %value                    : ${(value) => ({ value, exclude: false })}
 
-  ExcludeValue = ~"(" Value ")"
-  Value        = %number
+  ExcludeValue = ~"(" %value ")"
 `
