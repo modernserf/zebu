@@ -72,15 +72,15 @@ traffic.send({ type: "timer" }) // log { type: "yellow" }
 ```js
 const joinObjects = (objects) => objects.reduce((l, r) => Object.assign(l, r), {})
 const url = text`
-  URL       = Protocol ~"://" Host (~"/" Path)? (~"?" Search)? (~"#" Anchor)?
-              ${(protocol, host, path, search, anchor) => ({ protocol, host, path, search, anchor })}
-  Protocol  = ${/[a-z]+/}
-  Host      = ${/[A-Za-z0-9-]+/} / "."
-  Path      = (Component / "/") "/"?
-  Search    = Pair / "&"                ${joinObjects}
-  Pair      = Component ~"=" Component  ${(key, value) => ({[key]: value})}
-  Anchor    = Component
-  Component = ${/[A-Za-z0-9()_\-~]/}    ${decodeURIComponent}
+  URL       = Protocol Host Path? "/"? Search? Anchor?
+              : ${(protocol, host, path, _, search, anchor) => ({ protocol, host, path, search, anchor })}
+  Protocol  = ${/[a-z]+/} "://"
+  Host      = ${/[A-Za-z0-9-]+/} ++ "."
+  Path      = "/" (Component ++ "/")  : ${(_, path) => path}
+  Search    = "?" Pair ++ "&"         : ${(_, pairs) => joinObjects(pairs)}
+  Pair      = Component "=" Component : ${(key, _, value) => ({[key]: value})}
+  Anchor    = "#" Component           : ${(_, target) => target}
+  Component = ${/[A-Za-z0-9()_\-~]/}  : ${decodeURIComponent}
 `
 url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
 /* => { 
@@ -94,6 +94,11 @@ url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
   },
 } */
 ```
+
+## How it works
+
+LLL is a parser generator, but instead of targeting 
+
 
 ## Writing a language
 

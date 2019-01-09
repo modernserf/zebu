@@ -130,7 +130,6 @@ const unquote = (x) => x && x[QUOTE] ? x[QUOTE]() : x
 
 const CUT = Symbol('CUT')
 
-const DROP = Symbol('DROP')
 class SeqParser {
   constructor (mapFn, parsers) {
     this.mapFn = mapFn
@@ -150,9 +149,7 @@ class SeqParser {
         if (didCut) { throw new Error(res.error) }
         return res
       }
-      if (res.node !== DROP) {
-        out.push(res.node)
-      }
+      out.push(res.node)
       subject = update(subject, res)
     }
     return output(quote(this.mapFn, out), subject.index)
@@ -166,20 +163,6 @@ class SeqParser {
  * @param  {...Parser} parsers
  */
 export const seq = (mapFn, ...parsers) => new SeqParser(mapFn, parsers)
-
-class DropParser {
-  constructor (parser) {
-    this._droppedParser = parser
-  }
-  parse (subject) {
-    const res = this._droppedParser.parse(subject)
-    if (!res.ok) { return res }
-    subject = update(subject, res)
-    return output(DROP, subject.index)
-  }
-}
-
-export const drop = (parser) => new DropParser(parser)
 
 export function test_seq_matches_a_sequence (expect) {
   const parser = seq((_, value) => value, lit('('), token('foo'), lit(')'))
@@ -276,8 +259,8 @@ export const sepBy = (valueParser, separatorParser, min, max) =>
   seq(
     (head, tail) => [head, ...tail],
     valueParser, repeat(seq(
-      (x) => x,
-      drop(separatorParser), valueParser
+      (_, x) => x,
+      separatorParser, valueParser
     ), min, max))
 
 export function test_sepBy (expect) {
@@ -291,19 +274,6 @@ export function test_sepBy (expect) {
   const parser = sepBy(
     token('identifier'),
     token('bar')
-  )
-  expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
-}
-
-export function test_sepBy_peek (expect) {
-  const tokens = [
-    $t('identifier', 'x'),
-    $t('identifier', 'y'),
-    $t('identifier', 'z'),
-  ]
-  const parser = sepBy(
-    token('identifier'),
-    peek(token('identifier'))
   )
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
@@ -325,39 +295,6 @@ export function test_wrappedWith (expect) {
   )
   expect(parse(parser, tokens)).toEqual('foo')
 }
-
-class NotParser {
-  constructor (parser) {
-    this.parser = parser
-  }
-  parse (subject) {
-    return this.parser.parse(subject).ok
-      ? error(['unexpected', this.parser], subject)
-      : output(DROP, subject.index)
-  }
-}
-/**
- * match if the parser fails; fail if it matches. Consumes no input.
- * @param {Parser} parser
- */
-export const not = (parser) => new NotParser(parser)
-
-class PeekParser {
-  constructor (parser) {
-    this.parser = parser
-  }
-  parse (subject) {
-    return this.parser.parse(subject).ok
-      ? output(DROP, subject.index)
-      : error(['expected', this.parser], subject)
-  }
-}
-
-/**
- * match if the parser succeeds, but do not consume input.
- * @param {Parser} parser
- */
-export const peek = (parser) => new PeekParser(parser)
 
 // A = A B | C -> A = C B*
 const list = (...xs) => xs
