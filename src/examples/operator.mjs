@@ -1,18 +1,18 @@
 import { lang } from '../index'
-import { nil, lit, seq, alt, drop, repeat, wrappedWith, parse, token } from '../parse-utils'
+import { lit, seq, alt, repeat, wrappedWith, parse } from '../parse-utils'
 import { tokenize } from '../token-utils'
 
-const seqi = (...ps) => seq((x) => x, ...ps)
-const dline = drop(alt(token('line'), nil))
+const dline = lang`line? : ${() => null}`
+const filterList = (...xs) => xs.filter((x) => x !== null)
 
 const op = lang`
-  Program   = (Rule ** line) line? RootRule : ${compile}
-  Rule      = Fixity AltExpr                : ${(fixity, operators) => [fixity, operators]}
+  Program   = (Rule ** line) RootRule?  : ${compile}
+  Rule      = Fixity AltExpr            : ${(fixity, operators) => [fixity, operators]}
   Fixity    = "left" | "right" | "pre" | "post"
   AltExpr   = Expr ++ line
-  Expr      = Pattern ":" value             : ${(pattern, _, mapFn) => ({ pattern, mapFn })}
-  Pattern   = value+                        : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
-  RootRule  = "root" value                  : ${(_, value) => value}
+  Expr      = Pattern ":" value         : ${(pattern, _, mapFn) => ({ pattern, mapFn })}
+  Pattern   = value+                    : ${(strs) => seq(filterList, dline, ...strs.map(lit), dline)}
+  RootRule  = (line? "root") value      : ${(_, value) => value}
 `
 
 const applyLeft = (first, rest) => rest.reduce((l, fn) => fn(l), first)
@@ -22,17 +22,17 @@ const repeatOps = (operatorDefs, fn) => repeat(alt(...operatorDefs.map(fn)))
 const seqLeft = (base, operatorDefs, fn) => seq(applyLeft, base, repeatOps(operatorDefs, fn))
 const seqRight = (operatorDefs, fn, base) => seq(applyRight, repeatOps(operatorDefs, fn), base)
 
-function compile (rules, _, rootParser) {
+function compile (rules, rootParser = lang`value`) {
   // apply rules bottom-to-top
   const expr = rules.reduceRight((base, [fixity, operatorDefs]) => {
     switch (fixity) {
       case 'left':
         return seqLeft(base, operatorDefs, ({ pattern, mapFn }) =>
-          seq((r) => (l) => mapFn(l, r), drop(pattern), base)
+          seq((_, r) => (l) => mapFn(l, r), pattern, base)
         )
       case 'right':
         return seqRight(operatorDefs, ({ pattern, mapFn }) =>
-          seq((l) => (r) => mapFn(l, r), base, drop(pattern)),
+          seq((l) => (r) => mapFn(l, r), base, pattern),
         base)
       case 'post':
         return seqLeft(base, operatorDefs, ({ pattern, mapFn }) =>
@@ -47,7 +47,7 @@ function compile (rules, _, rootParser) {
     wrappedWith(lit('('), () => expr, lit(')')),
     rootParser
   ))
-  const wrapped = seqi(dline, expr, dline)
+  const wrapped = seq((_, x) => x, dline, expr, dline)
   const tts = (strings, ...interpolations) => {
     const tokens = Array.from(tokenize(strings, interpolations))
     return parse(wrapped, tokens)
@@ -68,8 +68,8 @@ export function test_operator_parser (expect) {
     pre   "-"   : ${x => -x}
     post  "++"  : ${x => x + 1}
           "--"  : ${x => x - 1}
-    root  ${seq((x) => x.value, token('value'))}
   `
+  // TODO: i suspect this is working because of `valueOf`
   expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
   expect(math`3 * (4 / 5) * 6`).toEqual(3 * (4 / 5) * 6)
   expect(math`
