@@ -97,7 +97,7 @@ url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
 
 ## Writing a language
 
-LLL is a parser generator, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or (Nearley)[https://nearley.js.org]. With LLL, you define grammars with tagged template literals. Here's a grammar that parses JSON:
+LLL is a parser generator, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or [Nearley](https://nearley.js.org). With LLL, you define grammars with tagged template literals. Here's a grammar that parses JSON:
 
 ```js
 const fromPairs = (pairs = []) =>
@@ -127,6 +127,8 @@ json`{
 // => { foo: [true, null, -123.45], bar: 42 }
 
 ```
+
+Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, LLL targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). It also provides much less control over the tokenizer -- 
 
 
 
