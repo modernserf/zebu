@@ -56,7 +56,7 @@ export function test_LazyParser (expect) {
     alt(
       seq((_, x) => x, lit('('), Expr, lit(')')),
       seq((_, x) => -x, lit('-'), Expr),
-      seq(({ value }) => value, token('number'))
+      token('number')
     ))
   // -(-(123))
   const tokens = [
@@ -92,7 +92,7 @@ export class MatchParser {
     const token = atIndex(subject)
     if (!token) { return error('unexpected end of input', subject) }
     return this.matchFn(token)
-      ? output(atIndex(subject), subject.index + 1)
+      ? output(atIndex(subject).value, subject.index + 1)
       : error(this.err, subject)
   }
 }
@@ -106,7 +106,7 @@ export const token = (type) => new MatchParser(
   ['did not match type', type])
 
 export function test_token_matches_a_type (expect) {
-  expect(parse(token('foo'), [{ type: 'foo' }])).toEqual({ type: 'foo' })
+  expect(parse(token('foo'), [{ type: 'foo', value: 1 }])).toEqual(1)
   expect(() => { parse(token('foo'), [{ type: 'bar' }]) }).toThrow()
 }
 
@@ -121,7 +121,7 @@ export const lit = (value) => new MatchParser(
 export function test_lit_matches_values (expect) {
   const parser = lit('(')
   const tokens = [$t('structure', '(')]
-  expect(parse(parser, tokens)).toEqual($t('structure', '('))
+  expect(parse(parser, tokens)).toEqual('(')
 }
 
 const QUOTE = Symbol('QUOTE')
@@ -185,10 +185,10 @@ export function test_seq_matches_a_sequence (expect) {
   const parser = seq((_, value) => value, lit('('), token('foo'), lit(')'))
   const tokens = [
     $t('structure', '('),
-    $t('foo'),
+    $t('foo', 1),
     $t('structure', ')'),
   ]
-  expect(parse(parser, tokens)).toEqual($t('foo'))
+  expect(parse(parser, tokens)).toEqual(1)
 }
 
 class AltParser {
@@ -217,8 +217,8 @@ export const alt = (...parsers) =>
 
 export function test_alt_matches_one_of_options (expect) {
   const parser = alt(token('foo'), token('bar'))
-  expect(parse(parser, [$t('foo')])).toEqual($t('foo'))
-  expect(parse(parser, [$t('bar')])).toEqual($t('bar'))
+  expect(parse(parser, [$t('foo', 1)])).toEqual(1)
+  expect(parse(parser, [$t('bar', 2)])).toEqual(2)
 }
 
 class RepeatParser {
@@ -259,7 +259,7 @@ export function test_repeat (expect) {
     $t('identifier', 'z'),
     $t('foo'),
   ]
-  const parser = seq(x => x, repeat(seq(({ value }) => value, token('identifier'))), token('foo'))
+  const parser = seq(x => x, repeat(token('identifier')), token('foo'))
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
 }
 
@@ -289,7 +289,7 @@ export function test_sepBy (expect) {
     $t('identifier', 'z'),
   ]
   const parser = sepBy(
-    seq(({ value }) => value, token('identifier')),
+    token('identifier'),
     token('bar')
   )
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
@@ -302,7 +302,7 @@ export function test_sepBy_peek (expect) {
     $t('identifier', 'z'),
   ]
   const parser = sepBy(
-    seq(({ value }) => value, token('identifier')),
+    token('identifier'),
     peek(token('identifier'))
   )
   expect(parse(parser, tokens)).toEqual(['x', 'y', 'z'])
@@ -318,13 +318,10 @@ export function test_wrappedWith (expect) {
     $t('identifier', 'foo'),
     $t('token', ')'),
   ]
-  const parser = seq(
-    ({ value }) => value,
-    wrappedWith(
-      lit('('),
-      () => token('identifier'),
-      lit(')')
-    )
+  const parser = wrappedWith(
+    lit('('),
+    () => token('identifier'),
+    lit(')')
   )
   expect(parse(parser, tokens)).toEqual('foo')
 }
@@ -383,7 +380,7 @@ export function test_left_recursion (expect) {
     $t('identifier', '/'),
     $t('number', 3),
   ]
-  const num = seq(({ value }) => value, token('number'))
+  const num = token('number')
   const parser = left(
     (left, _, right) => left / right,
     num, lit('/'), num,

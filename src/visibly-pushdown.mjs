@@ -1,4 +1,4 @@
-import { nil, alt, seq, repeat, token as tok, lit as literal, wrappedWith, sepBy, left, right, parse } from './parse-utils.mjs'
+import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy, left, right, parse } from './parse-utils.mjs'
 import { tokenize } from './token-utils.mjs'
 
 class MismatchedOperatorExpressionError extends Error {}
@@ -15,13 +15,9 @@ const id = (x) => x
 const _2 = (_, x) => x
 const list = (...xs) => xs
 const notNull = (x) => x !== null
-const valueOf = (x) => x.value
-
-const lit = (str) => seq(valueOf, literal(str))
-const token = (type) => seq(valueOf, tok(type))
 
 const drop = (p) => seq(() => null, p)
-const dlit = (x) => drop(literal(x))
+const dlit = (x) => drop(lit(x))
 const tag = (type) => (...values) => [type, ...values.filter(notNull)]
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
