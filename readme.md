@@ -39,7 +39,7 @@ const types = propTypes`
 } */
 ```
 
-### Matrix math operations
+### [Matrix math operations](https://github.com/modernserf/little-language-lab/blob/master/src/examples/matrix.mjs)
 ```js
 const x = [
   [7, 1],
@@ -47,7 +47,7 @@ const x = [
 ]
 matrix`
   [ 2 0 
-    1 3 ] * ${x}
+   -1 3 ] * ${x}
 `
 // => [[14, 2], [-13, 8]]
 ```
@@ -95,37 +95,40 @@ url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
 } */
 ```
 
-## How it works
-
-LLL is a parser generator, but instead of targeting 
-
-
 ## Writing a language
 
-TODO: example grammar. probably the `lang` grammar itself
+LLL is a parser generator, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or (Nearley)[https://nearley.js.org]. With LLL, you define grammars with tagged template literals. Here's a grammar that parses JSON:
 
 ```js
-lang`
-  Language  = Rule ** (line | ";")
-            | Expr
-  Rule      = identifier "=" Expr
-  Expr      = (Infix ++ "|") line? "|" AltExpr
-            | AltExpr
-  Infix     = "<" "." SepExpr+ ">" MapFunc
-            | "<" SepExpr+ "." ">" MapFunc
-  AltExpr   = SeqExpr ++ "|"
-  SeqExpr   = SepExpr+ MapFunc?
-  SepExpr   = RepExpr ("**" | "++") RepExpr
-            | RepExpr
-  RepExpr   = BaseExpr ("*" | "+" | "?" | nil)
-  BaseExpr  = ["(" Expr ")"]
-            | ["[" (value Expr value MapFunc?) "]"]
-            | "include" value
-            | identifier
-            | value
-  MapFunc   = line? ":" value
+const fromPairs = (pairs = []) =>
+  pairs.reduce((obj, [key, value]) => Object.assign(obj, { [key]: value }), {})
+const json = lang`
+  Start = Expr
+  Pair  = value ":" Expr          : ${(k, _, v) => [k, v]}
+
+  Expr  = [ "[" Expr ** "," "]" ] : ${(xs = []) => xs}
+        | [ "{" Pair ** "," "}" ] : ${fromPairs}
+        | value
+        | "true"                  : ${() => true}
+        | "false"                 : ${() => false}
+        | "null"                  : ${() => null}
 `
 ```
+
+This returns a function that, in turn, is used for tagged template literals:
+
+```js
+const value = 42
+
+json`{ 
+  "foo": [true, null, -123.45], 
+  "bar": ${42} 
+}`
+// => { foo: [true, null, -123.45], bar: 42 }
+
+```
+
+
 
 ### Vocabulary
 TODO: adapt vocabulary section from nearley https://nearley.js.org/docs/grammar

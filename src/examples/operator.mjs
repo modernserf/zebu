@@ -5,7 +5,7 @@ import { tokenize } from '../token-utils'
 const dline = lang`line? : ${() => null}`
 const filterList = (...xs) => xs.filter((x) => x !== null)
 
-const op = lang`
+export const op = lang`
   Program   = (Rule ** line) RootRule?  : ${compile}
   Rule      = Fixity AltExpr            : ${(fixity, operators) => [fixity, operators]}
   Fixity    = "left" | "right" | "pre" | "post"

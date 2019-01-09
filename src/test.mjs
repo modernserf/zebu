@@ -5,12 +5,13 @@ import * as visiblyPushdown from './visibly-pushdown'
 import * as jsonExample from './examples/json'
 import * as propTypesExample from './examples/prop-types'
 import * as operatorExample from './examples/operator'
+import * as matrixExample from './examples/matrix'
 import * as nondet from './nondet'
 import * as resumableErrors from './resumable-errors'
 
 const modules = [
   parseUtils, tokenUtils, visiblyPushdown, nondet,
-  jsonExample, propTypesExample, operatorExample,
+  jsonExample, propTypesExample, operatorExample, matrixExample,
   resumableErrors,
 ]
 
