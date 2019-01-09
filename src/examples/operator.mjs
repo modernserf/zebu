@@ -8,10 +8,10 @@ const dline = drop(alt(token('line'), nil))
 const op = lang`
   Program   = (Rule ** line) line? RootRule : ${compile}
   Rule      = Fixity AltExpr                : ${(fixity, operators) => [fixity, operators]}
+  Fixity    = "left" | "right" | "pre" | "post"
   AltExpr   = Expr ++ line
   Expr      = Pattern ":" value             : ${(pattern, _, mapFn) => ({ pattern, mapFn })}
   Pattern   = value+                        : ${(strs) => seqi(dline, ...strs.map(lit), dline)}
-  Fixity    = ("left" | "right" | "pre" | "post")
   RootRule  = "root" value                  : ${(_, value) => value}
 `
 

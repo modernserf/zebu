@@ -129,12 +129,24 @@ TODO: adapt vocabulary section from nearley https://nearley.js.org/docs/grammar
 
 TODO: show how text is tokenized, including removed whitespace, comments, joined operators. emphasize that tokenization is same between the definition language & the generated language
 
+`line` match a linebreak.
+`value` - match a literal value -- a number or a quoted string -- or an interpolated value
+`identifier` - match a
+
 ### Parsing
 
 TODO: examples, three columns: grammar on left, example text in middle, parse tree on right
 
-`line` - match a linebreak.
-`value` - match a literal value -- a number or a quoted string -- or an interpolated value
-`identifier` - match a
-`"include"` `"="` - match a token with this text
-`
+`"include"` `"+"` - match a token with this text
+`Expr` `value` - match tokens that match this rule
+`exprA | exprB` - try matching `exprA`, else match `exprB`
+`< . "+" expr > : ${func}` - match a left-associative infix expression, and reduce over `func`
+`< expr "**" . > : ${func}` - match a right-associative infix expression, and reduce over `func`
+`exprA exprB : ${func}` - match a sequence of exprA and exprB. if `func` provided, return `func` called with values of all exprs, otherwise return value of first expr
+`expr ++ separator` - match one or more `expr` separated by `separator`
+`expr ** separator` - match zero or more `expr` separated by `separator`
+`expr+` - match one or more expr
+`expr*` - match zero or more expr
+`expr?` - match zero or one expr
+`[ startToken expr endToken : ${func} ]` match `expr` wrapped with `startToken` and `endToken`. This is the only rule that can refer to rules defined above it. if func is provided, return `func(startToken, expr, endToken)`, otherwise return expr
+
