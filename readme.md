@@ -128,7 +128,7 @@ json`{
 
 ```
 
-Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, LLL targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). It also provides much less control over the tokenizer -- 
+Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, LLL targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). This means that
 
 
 
@@ -147,16 +147,16 @@ TODO: show how text is tokenized, including removed whitespace, comments, joined
 
 TODO: examples, three columns: grammar on left, example text in middle, parse tree on right
 
-`"include"` `"+"` - match a token with this text
-`Expr` `value` - match tokens that match this rule
-`exprA | exprB` - try matching `exprA`, else match `exprB`
-`< . "+" expr > : ${func}` - match a left-associative infix expression, and reduce over `func`
-`< expr "**" . > : ${func}` - match a right-associative infix expression, and reduce over `func`
-`exprA exprB : ${func}` - match a sequence of exprA and exprB. if `func` provided, return `func` called with values of all exprs, otherwise return value of first expr
-`expr ++ separator` - match one or more `expr` separated by `separator`
-`expr ** separator` - match zero or more `expr` separated by `separator`
-`expr+` - match one or more expr
-`expr*` - match zero or more expr
-`expr?` - match zero or one expr
-`[ startToken expr endToken : ${func} ]` match `expr` wrapped with `startToken` and `endToken`. This is the only rule that can refer to rules defined above it. if func is provided, return `func(startToken, expr, endToken)`, otherwise return expr
+- `"include"` `"+"` - match a token with this text
+- `Expr` `value` - match tokens that match this rule
+- `exprA | exprB` - try matching `exprA`, else match `exprB`
+- `< . "+" expr > : ${func}` - match a left-associative infix expression, and reduce over `func`
+- `< expr "**" . > : ${func}` - match a right-associative infix expression, and reduce over `func`
+- `exprA exprB : ${func}` - match a sequence of exprA and exprB. if `func` provided, return `func` called with values of all exprs, otherwise return value of first expr
+- `expr ++ separator` - match one or more `expr` separated by `separator`
+- `expr ** separator` - match zero or more `expr` separated by `separator`
+- `expr+` - match one or more expr
+- `expr*` - match zero or more expr
+- `expr?` - match zero or one expr
+- `[ startToken expr endToken : ${func} ]` match `expr` wrapped with `startToken` and `endToken`. This is the only rule that can refer to rules defined above it. if func is provided, return `func(startToken, expr, endToken)`, otherwise return expr
 

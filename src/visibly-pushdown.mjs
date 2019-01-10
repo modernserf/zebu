@@ -1,5 +1,5 @@
-import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy, left, right, parse } from './parse-utils.mjs'
-import { tokenize } from './token-utils.mjs'
+import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy, left, right } from './parse-utils.mjs'
+import { tag, createCompiler, createTTS } from './compiler-utils'
 
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
@@ -14,17 +14,15 @@ class WrapCtxError extends Error {
 const id = (x) => x
 const _2 = (_, x) => x
 const list = (...xs) => xs
-const notNull = (x) => x !== null
 
 const drop = (p) => seq(() => null, p)
 const dlit = (x) => drop(lit(x))
-const tag = (type) => (...values) => [type, ...values.filter(notNull)]
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
 
 const line = token('line')
 const ignoreLines = drop(alt(line, nil))
-const wrapIgnoreLines = (parser) => seq(_2, ignoreLines, parser, ignoreLines)
+const wrapIgnoreLines = (parser) => seq(_2, alt(line, nil), parser, alt(line, nil))
 const op = (str) => wrapIgnoreLines(dlit(str))
 
 const terminal = seq(tag('literal'), token('value'))
@@ -107,24 +105,21 @@ const baseScope = {
 
 const compiler = createCompiler({
   program: (rules, ctx) => {
+    const firstRuleID = rules[0][1]
     ctx.scope = { ...baseScope }
     ctx.usedTerminals = {}
     // iterate through rules bottom-to-top
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
-
-    const firstRuleID = rules[0][1]
-    const out = wrapIgnoreLines(ctx.scope[firstRuleID])
-    out.scope = ctx.scope
-    return out
+    return createTTS(ctx.scope[firstRuleID])
   },
   rootExpr: (expr, ctx) => {
     ctx.scope = { ...baseScope }
     ctx.usedTerminals = {}
-    return wrapIgnoreLines(ctx.eval(expr))
+    return createTTS(ctx.eval(expr))
   },
-  nil: () => wrapIgnoreLines(nil),
+  nil: () => createTTS(nil),
   rule: (name, rule, ctx) => {
     ctx.scope[name] = ctx.eval(rule)
   },
@@ -192,32 +187,7 @@ const compiler = createCompiler({
   literal: compileTerminal(lit),
 })
 
-function createCompiler (model) {
-  return (ast) => {
-    const ctx = {
-      eval: ([type, ...payload]) =>
-        model[type](...payload, ctx),
-      evalWith: (...extra) =>
-        ([type, ...payload]) =>
-          model[type](...payload, ctx, ...extra),
-    }
-    return ctx.eval(ast)
-  }
-}
-
-const rootParser = seq(compiler, program)
-
-export function lang (strings, ...interpolations) {
-  const tokens = Array.from(tokenize(strings.raw, interpolations))
-  const childParser = parse(rootParser, tokens)
-  const childTTS = (strings, ...interpolations) => {
-    const tokens = Array.from(tokenize(strings.raw, interpolations))
-    return parse(childParser, tokens)
-  }
-  childTTS.parse = (subject) => childParser.parse(subject)
-  childTTS.get = (key) => childParser.scope[key]
-  return childTTS
-}
+export const lang = createTTS(seq(compiler, program))
 
 export function test_lang_nil_language (expect) {
   const nil = lang``
@@ -315,16 +285,4 @@ export function test_interpolated_parser (expect) {
   const num = lang`value`
   const list = lang`${num}+`
   expect(list`1 2 3`).toEqual([1, 2, 3])
-}
-
-export function test_parser_lookup_rules (expect) {
-  const l = lang`
-    Number = value
-    Keyword = "foo"
-  `
-  const paren = (rule) => lang`["(" ${rule} ")"] | ${rule}`
-  const parenNumber = paren(l)
-  expect(parenNumber`(1)`).toEqual(1)
-  const parenString = paren(l.get('Keyword'))
-  expect(parenString`(foo)`).toEqual('foo')
 }

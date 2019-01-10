@@ -1,9 +1,8 @@
 import { lang } from '../index'
-import { lit, seq, alt, repeat, wrappedWith, parse } from '../parse-utils'
-import { tokenize } from '../token-utils'
+import { lit, seq, alt, repeat, wrappedWith, padded } from '../parse-utils'
+import { createTTS } from '../compiler-utils'
 
-const dline = lang`line? : ${() => null}`
-const filterList = (...xs) => xs.filter((x) => x !== null)
+const list = (...xs) => xs
 
 export const op = lang`
   Program   = (Rule ** line) RootRule?  : ${compile}
@@ -11,7 +10,7 @@ export const op = lang`
   Fixity    = "left" | "right" | "pre" | "post"
   AltExpr   = Expr ++ line
   Expr      = Pattern ":" value         : ${(pattern, _, mapFn) => ({ pattern, mapFn })}
-  Pattern   = value+                    : ${(strs) => seq(filterList, dline, ...strs.map(lit), dline)}
+  Pattern   = value+                    : ${(strs) => padded(seq(list, ...strs.map(lit)))}
   RootRule  = (line? "root") value      : ${(_, value) => value}
 `
 
@@ -47,14 +46,7 @@ function compile (rules, rootParser = lang`value`) {
     wrappedWith(lit('('), () => expr, lit(')')),
     rootParser
   ))
-  const wrapped = seq((_, x) => x, dline, expr, dline)
-  const tts = (strings, ...interpolations) => {
-    const tokens = Array.from(tokenize(strings, interpolations))
-    return parse(wrapped, tokens)
-  }
-  tts.parse = (subj) => expr.parse(subj)
-
-  return tts
+  return createTTS(expr)
 }
 
 export function test_operator_parser (expect) {

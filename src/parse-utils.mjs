@@ -325,6 +325,10 @@ export function test_left_recursion (expect) {
   expect(parse(parser, tokens)).toEqual(1 / 2 / 3)
 }
 
+const line = token('line')
+export const padded = (parser) =>
+  seq((_, x) => x, alt(line, nil), parser, alt(line, nil))
+
 /**
  * Parse a stream of tokens, and return the output.
  * @param {Parser} parser
