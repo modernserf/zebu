@@ -46,7 +46,7 @@ function compile (rules, rootParser = lang`value`) {
     wrappedWith(lit('('), () => expr, lit(')')),
     rootParser
   ))
-  return createTTS(expr)
+  return createTTS(expr, { usedTerminals: { '(': 'startToken', ')': 'endToken' } })
 }
 
 export function test_operator_parser (expect) {

@@ -269,14 +269,42 @@ export function test_sepBy (expect) {
 }
 
 const _2 = (_, x) => x
+class WrappedWithParser {
+  constructor (start, getContent, end, mapFn) {
+    this.start = start
+    this.content = new LazyParser(getContent)
+    this.end = end
+    this.mapFn = mapFn
+  }
+  parse (subject) {
+    const token = atIndex(subject)
+    if (!token) { return error('unexpected end of input', subject) }
+    if (token.type !== 'structure') { return error('not a structure', subject) }
+
+    if (this.start.matchFn(token.startToken) && this.end.matchFn(token.endToken)) {
+      const innerSubject = new ParseSubject(token.value, 0)
+      const res = this.content.parse(innerSubject)
+      if (!res.ok) { return res }
+      if (res.index !== token.value.length) {
+        return error('incomplete match', subject)
+      }
+      return output(res.node, subject.index + 1)
+    }
+    return error('no match for structure', subject)
+  }
+}
+
 export const wrappedWith = (left, getContent, right, mapFn = _2) =>
-  seq(mapFn, left, new LazyParser(getContent), right)
+  new WrappedWithParser(left, getContent, right, mapFn)
 
 export function test_wrappedWith (expect) {
   const tokens = [
-    $t('token', '('),
-    $t('identifier', 'foo'),
-    $t('token', ')'),
+    {
+      type: 'structure',
+      value: [$t('identifier', 'foo')],
+      startToken: $t('token', '('),
+      endToken: $t('token', ')'),
+    },
   ]
   const parser = wrappedWith(
     lit('('),

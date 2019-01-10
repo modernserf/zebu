@@ -29,35 +29,19 @@ const baseTokenizer = moo.states({
   },
 })
 
-function withProcessedStream (tokenizer) {
-  let consolidatingLines = false
-  tokenizer.next = filterIter(tokenizer.next.bind(tokenizer), (tok) => {
-    if (tok.type === 'ignore') { return false }
-    if (tok.type === 'line') {
-      if (consolidatingLines) { return false }
-      consolidatingLines = true
-      return true
-    } else {
-      consolidatingLines = false
-      return true
-    }
-  })
-  return tokenizer
-}
-
-// TODO: should this used around `tokenize` instead of `withProcessedStream`
-// so that the interpolated values pass through it?
-const tokenizer = withProcessedStream(baseTokenizer)
-
 /**
  * @param {[String]} strs
  * @param {[Object]} interpolations
  */
-export function * tokenize (strs, interpolations) {
+export function tokenize (strs, interpolations, terminalMap = {}) {
+  return skeletonize(tokenizeWithInterpolations(strs, interpolations), terminalMap)
+}
+
+function * tokenizeWithInterpolations (strs, interpolations) {
   let lastState
   for (const str of strs) {
-    yield * tokenizer.reset(str, lastState)
-    lastState = tokenizer.save()
+    yield * baseTokenizer.reset(str, lastState)
+    lastState = baseTokenizer.save()
     if (interpolations.length) {
       let value = interpolations.shift()
       // don't yield interpolated values in comments
@@ -68,12 +52,37 @@ export function * tokenize (strs, interpolations) {
   }
 }
 
-function filterIter (next, filterFn) {
-  return () => {
-    let tok
-    while ((tok = next())) {
-      if (filterFn(tok)) { break }
+function skeletonize (tokens, terminalMap) {
+  const stack = [{ value: [] }]
+  let isConsolidatingLines = false
+  for (const tok of tokens) {
+    if (tok.type === 'ignore') { continue }
+    if (tok.type === 'line') {
+      if (isConsolidatingLines) { continue }
+      isConsolidatingLines = true
     }
-    return tok
+    isConsolidatingLines = false
+
+    if (tok.type === 'value') {
+      stack[stack.length - 1].value.push(tok)
+    } else if (terminalMap[tok.value] === 'startToken') {
+      stack.push({
+        type: 'structure',
+        value: [],
+        offset: tok.offset,
+        line: tok.line,
+        col: tok.col,
+        startToken: tok,
+      })
+    } else if (terminalMap[tok.value] === 'endToken') {
+      const structure = stack.pop()
+      structure.endToken = tok
+      const top = stack[stack.length - 1]
+      top.value.push(structure)
+    } else {
+      stack[stack.length - 1].value.push(tok)
+    }
   }
+  // TODO: error handling
+  return stack[0].value
 }

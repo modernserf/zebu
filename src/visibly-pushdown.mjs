@@ -107,17 +107,15 @@ const compiler = createCompiler({
   program: (rules, ctx) => {
     const firstRuleID = rules[0][1]
     ctx.scope = { ...baseScope }
-    ctx.usedTerminals = {}
     // iterate through rules bottom-to-top
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
-    return createTTS(ctx.scope[firstRuleID])
+    return createTTS(ctx.scope[firstRuleID], ctx)
   },
   rootExpr: (expr, ctx) => {
     ctx.scope = { ...baseScope }
-    ctx.usedTerminals = {}
-    return createTTS(ctx.eval(expr))
+    return createTTS(ctx.eval(expr), ctx)
   },
   nil: () => createTTS(nil),
   rule: (name, rule, ctx) => {
@@ -187,7 +185,14 @@ const compiler = createCompiler({
   literal: compileTerminal(lit),
 })
 
-export const lang = createTTS(seq(compiler, program))
+export const lang = createTTS(seq(compiler, program), {
+  usedTerminals: {
+    '(': 'startToken',
+    ')': 'endToken',
+    '[': 'startToken',
+    ']': 'endToken',
+  },
+})
 
 export function test_lang_nil_language (expect) {
   const nil = lang``
