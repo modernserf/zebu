@@ -6,26 +6,32 @@ const toNumber = (str) => Number(str.replace(/_/g, ''))
 const baseTokenizer = moo.states({
   main: {
     line: { match: /\n\s*/, lineBreaks: true },
-    whitespace: { type: () => 'ignore', match: /(?: |\t)+/ },
-    lineComment: { type: () => 'ignore', match: '//', next: 'lineComment' },
-    blockComment: { type: () => 'ignore', match: '/*', next: 'blockComment' },
-    dqstring: { type: () => 'value', match: /"(?:\\["\\]|[^\n"\\])*"/, value: trimQuotes },
-    sqstring: { type: () => 'value', match: /'(?:\\['\\]|[^\n'\\])*'/, value: trimQuotes },
-    decNumber: { type: () => 'value', match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/, value: toNumber },
-    hexNumber: { type: () => 'value', match: /0x[0-9A-Fa-f_]+/, value: toNumber },
-    octalNumber: { type: () => 'value', match: /0o[0-7_]+/, value: toNumber },
-    binaryNumber: { type: () => 'value', match: /0b[0-1_]+/, value: toNumber },
+    ignore: [
+      { match: /(?: |\t)+/ },
+      { match: '//', next: 'lineComment' },
+      { match: '/*', next: 'blockComment' },
+    ],
+    value: [
+      { match: /"(?:\\["\\]|[^\n"\\])*"/, value: trimQuotes },
+      { match: /'(?:\\['\\]|[^\n'\\])*'/, value: trimQuotes },
+      { match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/, value: toNumber },
+      { match: /0x[0-9A-Fa-f_]+/, value: toNumber },
+      { match: /0o[0-7_]+/, value: toNumber },
+      { match: /0b[0-1_]+/, value: toNumber },
+    ],
     identifier: { match: /[$_\p{ID_Start}][$\p{ID_Continue}]*/ },
     punctuation: { match: /[,;(){}[\]]/ },
     operator: { match: /[!@#%^&*\-+=|/:<>.?~]+/ },
   },
   lineComment: {
-    body: { type: () => 'ignore', match: /[^\n]+/ },
+    ignore: { match: /[^\n]+/ },
     line: { match: /\n+\s*/, lineBreaks: true, next: 'main' },
   },
   blockComment: {
-    body: { type: () => 'ignore', match: /(?:\*[^/]|[^*])+/, lineBreaks: true },
-    endComment: { type: () => 'ignore', match: '*/', next: 'main' },
+    ignore: [
+      { match: /(?:\*[^/]|[^*])+/, lineBreaks: true },
+      { match: '*/', next: 'main' },
+    ],
   },
 })
 
