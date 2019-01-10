@@ -128,8 +128,6 @@ const QUOTE = Symbol('QUOTE')
 const quote = (fn, values) => ({ [QUOTE]: () => unquote(fn)(...values.map(unquote)) })
 const unquote = (x) => x && x[QUOTE] ? x[QUOTE]() : x
 
-const CUT = Symbol('CUT')
-
 class SeqParser {
   constructor (mapFn, parsers) {
     this.mapFn = mapFn
@@ -137,18 +135,10 @@ class SeqParser {
   }
   parse (subject) {
     const out = []
-    let didCut = false
     for (const p of this.parsers) {
-      if (p === CUT) {
-        didCut = true
-        continue
-      }
       if (!p.parse) { console.warn('not a parser:', p, subject) }
       const res = p.parse(subject)
-      if (!res.ok) {
-        if (didCut) { throw new Error(res.error) }
-        return res
-      }
+      if (!res.ok) { return res }
       out.push(res.node)
       subject = update(subject, res)
     }
