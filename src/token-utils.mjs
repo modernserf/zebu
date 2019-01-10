@@ -1,6 +1,6 @@
 import moo from './moo.mjs'
 
-const trimQuotes = str => str.slice(1, -1)
+const trimQuotes = str => str.slice(1, -1).replace(/\\(.)/g, '$1')
 const toNumber = (str) => Number(str.replace(/_/g, ''))
 
 const baseTokenizer = moo.states({
@@ -9,8 +9,8 @@ const baseTokenizer = moo.states({
     whitespace: { type: () => 'ignore', match: /(?: |\t)+/ },
     lineComment: { type: () => 'ignore', match: '//', next: 'lineComment' },
     blockComment: { type: () => 'ignore', match: '/*', next: 'blockComment' },
-    dqstring: { type: () => 'value', match: /"(?:\\"|[^"\n])*"/, value: trimQuotes },
-    sqstring: { type: () => 'value', match: /'(?:\\'|[^'\n])*'/, value: trimQuotes },
+    dqstring: { type: () => 'value', match: /"(?:\\["\\]|[^\n"\\])*"/, value: trimQuotes },
+    sqstring: { type: () => 'value', match: /'(?:\\['\\]|[^\n'\\])*'/, value: trimQuotes },
     decNumber: { type: () => 'value', match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/, value: toNumber },
     hexNumber: { type: () => 'value', match: /0x[0-9A-Fa-f_]+/, value: toNumber },
     octalNumber: { type: () => 'value', match: /0o[0-7_]+/, value: toNumber },

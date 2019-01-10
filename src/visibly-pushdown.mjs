@@ -208,10 +208,10 @@ function createCompiler (model) {
 const rootParser = seq(compiler, program)
 
 export function lang (strings, ...interpolations) {
-  const tokens = Array.from(tokenize(strings, interpolations))
+  const tokens = Array.from(tokenize(strings.raw, interpolations))
   const childParser = parse(rootParser, tokens)
   const childTTS = (strings, ...interpolations) => {
-    const tokens = Array.from(tokenize(strings, interpolations))
+    const tokens = Array.from(tokenize(strings.raw, interpolations))
     return parse(childParser, tokens)
   }
   childTTS.parse = (subject) => childParser.parse(subject)
