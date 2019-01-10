@@ -69,7 +69,6 @@ export function test_operator_parser (expect) {
     post  "++"  : ${x => x + 1}
           "--"  : ${x => x - 1}
   `
-  // TODO: i suspect this is working because of `valueOf`
   expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
   expect(math`3 * (4 / 5) * 6`).toEqual(3 * (4 / 5) * 6)
   expect(math`
