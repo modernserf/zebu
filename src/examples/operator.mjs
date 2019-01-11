@@ -77,7 +77,7 @@ export function test_operator_parser_include (expect) {
       left "++" : ${(xs, ys) => xs.concat(ys)}
       root ${parent.RootExpr}
     `}
-    RootExpr  = ["[" Expr ** "," "]"]
+    RootExpr  = #[ Expr ** "," ]
               | value
   `
   expect(expr`["foo", "bar"] ++ ["baz"]`)

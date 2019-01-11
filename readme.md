@@ -104,14 +104,14 @@ const fromPairs = (pairs = []) =>
   pairs.reduce((obj, [key, value]) => Object.assign(obj, { [key]: value }), {})
 const json = lang`
   Start = Expr
-  Pair  = value ":" Expr          : ${(k, _, v) => [k, v]}
+  Pair  = value ":" Expr    : ${(k, _, v) => [k, v]}
 
-  Expr  = [ "[" Expr ** "," "]" ] : ${(xs = []) => xs}
-        | [ "{" Pair ** "," "}" ] : ${fromPairs}
+  Expr  = #[ Expr ** "," ]  : ${(xs = []) => xs}
+        | #{ Pair ** "," }  : ${fromPairs}
         | value
-        | "true"                  : ${() => true}
-        | "false"                 : ${() => false}
-        | "null"                  : ${() => null}
+        | "true"            : ${() => true}
+        | "false"           : ${() => false}
+        | "null"            : ${() => null}
 `
 ```
 

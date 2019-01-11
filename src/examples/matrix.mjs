@@ -13,7 +13,7 @@ const matrix = lang`
     post "T" : ${math.transpose}
     root ${parent.BaseExpr}
   `}
-  BaseExpr = ["[" (Row ++ Sep) "]"]
+  BaseExpr = #[ Row ++ Sep ]
            | value
   Sep      = line | ";"
 `

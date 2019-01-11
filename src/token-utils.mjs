@@ -90,6 +90,7 @@ function skeletonize (tokens) {
       stack[stack.length - 1].value.push(tok)
     }
   }
+  if (stack.length !== 1) { throw new Error('unbalanced brackets') }
   // TODO: error handling
   return stack[0].value
 }

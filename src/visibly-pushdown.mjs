@@ -4,12 +4,7 @@ import { tag, createCompiler, createTTS } from './compiler-utils'
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
 class ScopeNotDefinedError extends Error {}
-class WrapCtxError extends Error {
-  constructor (value, top, bottom) {
-    super()
-    this.message = `"${value}" cannot be used as both ${top} and ${bottom}`
-  }
-}
+class InvalidBracketLiteralError extends Error {}
 
 const id = (x) => x
 const _2 = (_, x) => x
@@ -25,18 +20,28 @@ const ignoreLines = drop(alt(line, nil))
 const wrapIgnoreLines = (parser) => seq(_2, alt(line, nil), parser, alt(line, nil))
 const op = (str) => wrapIgnoreLines(dlit(str))
 
-const terminal = seq(tag('literal'), token('value'))
-
 const mapFn = seq(_2, dlit(':'), token('value'))
 
 const baseExpr = alt(
   wrappedWith('(', () => expr, ')'),
   seq(tag('wrapped'), wrappedWith(
-    '[', () => seq(list, token('value'), sepExpr, token('value'), alt(mapFn, nil)), ']'
+    '[', () => seq(list, token('value'), sepExpr, token('value')), ']'
   )),
+  seq(tag('wrappedParen'),
+    dlit('#'),
+    wrappedWith('(', () => expr, ')')
+  ),
+  seq(tag('wrappedSquare'),
+    dlit('#'),
+    wrappedWith('[', () => expr, ']')
+  ),
+  seq(tag('wrappedCurly'),
+    dlit('#'),
+    wrappedWith('{', () => expr, '}')
+  ),
   seq(tag('include'), dlit('include'), token('value')),
   seq(tag('identifier'), token('identifier')),
-  terminal
+  seq(tag('literal'), token('value'))
 )
 
 // prefix and postfix operators, mutually exclusive
@@ -81,8 +86,6 @@ const program = alt(
   seq(tag('rootExpr'), wrapIgnoreLines(expr)),
   seq(tag('nil'), wrapIgnoreLines(nil))
 )
-
-const compileTerminal = (parser) => (value) => (value && value.parse) ? value : parser(value)
 
 const baseScope = {
   line: token('line'),
@@ -155,12 +158,15 @@ const compiler = createCompiler({
   repeat0: (expr, ctx) => repeat(ctx.eval(expr), 0),
   repeat1: (expr, ctx) => repeat(ctx.eval(expr), 1),
   maybe: (expr, ctx) => alt(ctx.eval(expr), nil),
-  wrapped: ([start, content, end], ctx) =>
-    wrappedWith(
-      start,
-      () => wrapIgnoreLines(ctx.eval(content)),
-      end,
-    ),
+  wrappedParen: (content, ctx) => wrappedWith(
+    '(', () => wrapIgnoreLines(ctx.eval(content)), ')'
+  ),
+  wrappedSquare: (content, ctx) => wrappedWith(
+    '[', () => wrapIgnoreLines(ctx.eval(content)), ']'
+  ),
+  wrappedCurly: (content, ctx) => wrappedWith(
+    '{', () => wrapIgnoreLines(ctx.eval(content)), '}'
+  ),
   identifier: (name, ctx) => {
     if (!ctx.scope) { throw new ScopeNotDefinedError(name) }
     const rule = ctx.scope[name]
@@ -170,8 +176,11 @@ const compiler = createCompiler({
     return rule
   },
   include: (getParser, ctx) => getParser(ctx.scope),
-  token: compileTerminal(token),
-  literal: compileTerminal(lit),
+  literal: (value) => {
+    if (value && value.parse) { return value }
+    if (/[(){}[\]]/.test(value)) { throw new InvalidBracketLiteralError() }
+    return lit(value)
+  },
 })
 
 export const lang = createTTS(seq(compiler, program))
@@ -191,7 +200,7 @@ export function test_lang_recursive_rules (expect) {
   const math = lang`
     Neg   = "-" Expr      : ${(_, value) => -value}
           | Expr
-    Expr  = ["(" Neg ")"  : ${(_, x) => x}]
+    Expr  = #( Neg )
           | value
   `
   expect(math`123`).toEqual(123)
@@ -201,10 +210,8 @@ export function test_lang_recursive_rules (expect) {
 }
 
 export function test_lang_recursive_rule_errors (expect) {
-  expect(() => { lang`Rule = ["( value "("]` }).toThrow()
   expect(() => {
     lang`
-      Root = ["( Value ")"]
       Value = "("
     `
   }).toThrow()
@@ -212,14 +219,14 @@ export function test_lang_recursive_rule_errors (expect) {
 
 export function test_lang_repeaters (expect) {
   const list = lang`
-    Expr  = ["(" Expr* ")"]
+    Expr  = #( Expr* )
           | identifier
   `
   expect(list`(foo bar (baz quux) xyzzy)`)
     .toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
   const nonEmptyList = lang`
-    Expr  = ["(" Expr+ ")"]
+    Expr  = #( Expr+ )
           | identifier
   `
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`)
@@ -240,7 +247,7 @@ export function test_lang_operator_precedence_assoc (expect) {
     NegExpr = "-" Expr                  : ${(_, x) => -x}
     PowExpr = < Expr (line? "**") . >   : ${(l, _, r) => l ** r}
             | Expr
-    Expr    = ["(" AddExpr ")"] 
+    Expr    = #( AddExpr ) 
             | value
   `
   expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)

@@ -8,7 +8,7 @@ const xmlisp = lang`
            | TagHead
   TagHead  = Tag line? Attrs      : ${(type, _, attrs) => ({ type, attrs, children: [] })}
   Body     = Expr ** line?
-  Expr     = ["[" TagBody  "]"]
+  Expr     = #[ TagBody ]
            | value
   
   Attrs    = Attr ** line?        : ${(objs) => objs.reduce((l, r) => Object.assign(l, r), {})}
