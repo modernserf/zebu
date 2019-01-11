@@ -19,8 +19,10 @@ const baseTokenizer = moo.states({
       { match: /0o[0-7_]+/, value: toNumber },
       { match: /0b[0-1_]+/, value: toNumber },
     ],
+    startToken: ['[', '(', '{'],
+    endToken: [']', ')', '}'],
+    punctuation: [',', ';'],
     identifier: { match: /[$_\p{ID_Start}][$\p{ID_Continue}]*/ },
-    punctuation: { match: /[,;(){}[\]]/ },
     operator: { match: /[!@#%^&*\-+=|/:<>.?~]+/ },
   },
   lineComment: {
@@ -58,7 +60,7 @@ function * tokenizeWithInterpolations (strs, interpolations) {
   }
 }
 
-function skeletonize (tokens, terminalMap) {
+function skeletonize (tokens) {
   const stack = [{ value: [] }]
   let isConsolidatingLines = false
   for (const tok of tokens) {
@@ -69,20 +71,19 @@ function skeletonize (tokens, terminalMap) {
     }
     isConsolidatingLines = false
 
-    if (tok.type === 'value') {
-      stack[stack.length - 1].value.push(tok)
-    } else if (terminalMap[tok.value] === 'startToken') {
+    if (tok.type === 'startToken') {
       stack.push({
         type: 'structure',
         value: [],
         offset: tok.offset,
         line: tok.line,
         col: tok.col,
-        startToken: tok,
+        startToken: tok.value,
       })
-    } else if (terminalMap[tok.value] === 'endToken') {
+    // TODO: match
+    } else if (tok.type === 'endToken') {
       const structure = stack.pop()
-      structure.endToken = tok
+      structure.endToken = tok.value
       const top = stack[stack.length - 1]
       top.value.push(structure)
     } else {

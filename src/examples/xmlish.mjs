@@ -1,42 +1,41 @@
 import { lang } from '../index'
+import assert from 'assert'
 
-const assertFn = (test, error) => (...args) => {
-  if (!test(...args)) { throw new Error(error) }
-  return args[0]
-}
-
-const xml = lang`
+const xmlisp = lang`
   Document = Body
-  TagBody  = TagHead (">" line?) Body : ${(obj, _, children) => ({ ...obj, children })}
-  TagHead  = Tag line? Attrs          : ${(type, _, attrs) => ({ type, attrs, children: [] })}
+  TagBody  = TagHead ("|" line?) Body (line? "|") Tag  
+             : ${(obj, _, children, __, closeTag) => { assert.strictEqual(obj.type, closeTag); return { ...obj, children } }}
+           | TagHead
+  TagHead  = Tag line? Attrs      : ${(type, _, attrs) => ({ type, attrs, children: [] })}
   Body     = Expr ** line?
-  Expr     = ["<" TagHead "/>"]
-           | ["<" TagBody "</" ] Tag ">" : ${assertFn((obj, closeTag) => obj.type === closeTag, 'tags do not match')}
+  Expr     = ["[" TagBody  "]"]
            | value
   
-  Attrs    = Attr ** line?            : ${(objs) => objs.reduce((l, r) => Object.assign(l, r), {})}
-  Attr     = identifier "=" value     : ${(key, _, value) => ({ [key]: value })}
+  Attrs    = Attr ** line?        : ${(objs) => objs.reduce((l, r) => Object.assign(l, r), {})}
+  Attr     = identifier "=" value : ${(key, _, value) => ({ [key]: value })}
   Tag      = identifier
 `
 
 export function test_xmlish_markup (expect) {
-  const doc = xml`
-    <head>
-      <title>"The Great Gatsby"</title>
-    </head>
-    <body>
-      <p class="foo">
-        "In my younger and more vulnerable years "<strong>"my father"</strong>" gave me some advice that I've been turning over in my mind "
-        <em>"ever since"</em>
+  const doc = xmlisp`
+    [head|
+      [title| "The Great Gatsby" |title]
+      [link rel="stylesheet" href="theme.css"]
+    |head]
+    [body|
+      [p class="foo"|
+        "In my younger and more vulnerable years " [strong|"my father"|strong]" gave me some advice that I've been turning over in my mind "
+        [em|"ever since"|em]
         ". \"Whenever you feel like criticizing any one,\" he told me, \"just remember that all the people in this world haven't had the advantages that you've had.\""
-      </p>
-    </body>
+      |p]
+    |body]
   `
   expect(doc).toEqual([
     { type: 'head',
       attrs: {},
       children: [
         { type: 'title', attrs: {}, children: ['The Great Gatsby'] },
+        { type: 'link', attrs: { rel: 'stylesheet', href: 'theme.css' }, children: [] },
       ] },
     { type: 'body',
       attrs: {},

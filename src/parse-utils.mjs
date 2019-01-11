@@ -281,7 +281,7 @@ class WrappedWithParser {
     if (!token) { return error('unexpected end of input', subject) }
     if (token.type !== 'structure') { return error('not a structure', subject) }
 
-    if (this.start.matchFn(token.startToken) && this.end.matchFn(token.endToken)) {
+    if (this.start === token.startToken && this.end === token.endToken) {
       const innerSubject = new ParseSubject(token.value, 0)
       const res = this.content.parse(innerSubject)
       if (!res.ok) { return res }
@@ -302,14 +302,14 @@ export function test_wrappedWith (expect) {
     {
       type: 'structure',
       value: [$t('identifier', 'foo')],
-      startToken: $t('token', '('),
-      endToken: $t('token', ')'),
+      startToken: '(',
+      endToken: ')',
     },
   ]
   const parser = wrappedWith(
-    lit('('),
+    '(',
     () => token('identifier'),
-    lit(')')
+    ')'
   )
   expect(parse(parser, tokens)).toEqual('foo')
 }

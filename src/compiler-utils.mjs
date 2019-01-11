@@ -11,17 +11,14 @@ export function createCompiler (model) {
       usedTerminals: {},
       eval: ([type, ...payload]) =>
         model[type](...payload, ctx),
-      evalWith: (...extra) =>
-        ([type, ...payload]) =>
-          model[type](...payload, ctx, ...extra),
     }
     return ctx.eval(ast)
   }
 }
 
-export function createTTS (parser, ctx = {}) {
+export function createTTS (parser) {
   const childTTS = (strings, ...interpolations) => {
-    const tokens = Array.from(tokenize(strings.raw, interpolations, ctx.usedTerminals))
+    const tokens = Array.from(tokenize(strings.raw, interpolations))
     return parse(padded(parser), tokens)
   }
   childTTS.parse = (subject) => parser.parse(subject)

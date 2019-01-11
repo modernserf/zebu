@@ -30,9 +30,9 @@ const terminal = seq(tag('literal'), token('value'))
 const mapFn = seq(_2, dlit(':'), token('value'))
 
 const baseExpr = alt(
-  wrappedWith(lit('('), () => expr, lit(')')),
+  wrappedWith('(', () => expr, ')'),
   seq(tag('wrapped'), wrappedWith(
-    lit('['), () => seq(list, terminal, sepExpr, terminal, alt(mapFn, nil)), lit(']')
+    '[', () => seq(list, token('value'), sepExpr, token('value'), alt(mapFn, nil)), ']'
   )),
   seq(tag('include'), dlit('include'), token('value')),
   seq(tag('identifier'), token('identifier')),
@@ -82,18 +82,7 @@ const program = alt(
   seq(tag('nil'), wrapIgnoreLines(nil))
 )
 
-const compileTerminal = (parser) => (value, ctx, wrapCtx = 'contentToken') => {
-  if (value && value.parse) {
-    return value
-  }
-
-  if (ctx.usedTerminals[value] &&
-    ctx.usedTerminals[value] !== wrapCtx) {
-    throw new WrapCtxError(value, wrapCtx, ctx.usedTerminals[value])
-  }
-  ctx.usedTerminals[value] = wrapCtx
-  return parser(value)
-}
+const compileTerminal = (parser) => (value) => (value && value.parse) ? value : parser(value)
 
 const baseScope = {
   line: token('line'),
@@ -111,11 +100,11 @@ const compiler = createCompiler({
     for (let i = rules.length - 1; i >= 0; i--) {
       ctx.eval(rules[i])
     }
-    return createTTS(ctx.scope[firstRuleID], ctx)
+    return createTTS(ctx.scope[firstRuleID])
   },
   rootExpr: (expr, ctx) => {
     ctx.scope = { ...baseScope }
-    return createTTS(ctx.eval(expr), ctx)
+    return createTTS(ctx.eval(expr))
   },
   nil: () => createTTS(nil),
   rule: (name, rule, ctx) => {
@@ -168,9 +157,9 @@ const compiler = createCompiler({
   maybe: (expr, ctx) => alt(ctx.eval(expr), nil),
   wrapped: ([start, content, end], ctx) =>
     wrappedWith(
-      ctx.evalWith('startToken')(start),
+      start,
       () => wrapIgnoreLines(ctx.eval(content)),
-      ctx.evalWith('endToken')(end)
+      end,
     ),
   identifier: (name, ctx) => {
     if (!ctx.scope) { throw new ScopeNotDefinedError(name) }
@@ -185,14 +174,7 @@ const compiler = createCompiler({
   literal: compileTerminal(lit),
 })
 
-export const lang = createTTS(seq(compiler, program), {
-  usedTerminals: {
-    '(': 'startToken',
-    ')': 'endToken',
-    '[': 'startToken',
-    ']': 'endToken',
-  },
-})
+export const lang = createTTS(seq(compiler, program))
 
 export function test_lang_nil_language (expect) {
   const nil = lang``
@@ -201,8 +183,8 @@ export function test_lang_nil_language (expect) {
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`"(" value ")" : ${(_, x) => x}`
-  expect(num`(123)`).toEqual(123)
+  const num = lang`"return" value : ${(_, x) => x}`
+  expect(num`return 123`).toEqual(123)
 }
 
 export function test_lang_recursive_rules (expect) {
