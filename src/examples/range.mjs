@@ -40,5 +40,5 @@ export const range = lang`
   End   = ExcludeValue            : ${(value) => ({ value, exclude: true })}
         | value                   : ${(value) => ({ value, exclude: false })}
 
-  ExcludeValue = "(" value ")"    : ${(_, value) => value}
+  ExcludeValue = #( value )
 `

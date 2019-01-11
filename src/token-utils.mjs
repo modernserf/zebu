@@ -41,8 +41,8 @@ const baseTokenizer = moo.states({
  * @param {[String]} strs
  * @param {[Object]} interpolations
  */
-export function tokenize (strs, interpolations, terminalMap = {}) {
-  return skeletonize(tokenizeWithInterpolations(strs, interpolations), terminalMap)
+export function tokenize (strs, interpolations) {
+  return skeletonize(tokenizeWithInterpolations(strs, interpolations))
 }
 
 function * tokenizeWithInterpolations (strs, interpolations) {
