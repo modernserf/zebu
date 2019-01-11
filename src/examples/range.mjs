@@ -1,4 +1,4 @@
-import { lang } from '../root-language'
+import { grammar } from '../root-language'
 
 const interval = (exclude) => (value, _, end) => ({
   value,
@@ -26,7 +26,7 @@ function * doRange (
   if (!excludeEnd && value === end) { yield value }
 }
 
-export const range = lang`
+export const range = grammar`
   OpenRange = < Range "," . >    : ${function * (l, _, r) { yield * l; yield * r }}
             | Start "..."        : ${doRange}
             | Range

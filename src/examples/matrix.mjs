@@ -1,8 +1,8 @@
 import math from 'mathjs' // NOTE: this takes a noticeably long time (~1s) to import!
-import { lang } from '../index'
+import { grammar } from '../index'
 import { op } from './operator'
 
-const matrix = lang`
+const matrix = grammar`
   Main = Expr
   Row  = Expr+
   Expr = include ${(parent) => op`

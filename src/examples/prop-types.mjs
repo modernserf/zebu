@@ -1,12 +1,12 @@
 import PropTypes from 'prop-types'
-import { lang } from '../index'
+import { grammar } from '../index'
 
 const pair = (key, _, value) => ({ [key]: value })
 const _2 = (_, x) => x
 const fromPairs = (pairs) => pairs.reduce(Object.assign, {})
 const ifMultiple = (fn) => (xs) => xs.length === 1 ? xs[0] : fn(xs)
 
-export const propTypes = lang`
+export const propTypes = grammar`
   Rules     = Rule ** (line | ";")  : ${fromPairs}
   Rule      = identifier ":" Expr   : ${pair}
 

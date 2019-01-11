@@ -183,21 +183,21 @@ const compiler = createCompiler({
   },
 })
 
-export const lang = createTTS(seq(compiler, program))
+export const grammar = createTTS(seq(compiler, program))
 
 export function test_lang_nil_language (expect) {
-  const nil = lang``
+  const nil = grammar``
   expect(nil`
   `).toEqual(undefined)
 }
 
 export function test_lang_single_expression (expect) {
-  const num = lang`"return" value : ${(_, x) => x}`
+  const num = grammar`"return" value : ${(_, x) => x}`
   expect(num`return 123`).toEqual(123)
 }
 
 export function test_lang_recursive_rules (expect) {
-  const math = lang`
+  const math = grammar`
     Neg   = "-" Expr      : ${(_, value) => -value}
           | Expr
     Expr  = #( Neg )
@@ -211,21 +211,21 @@ export function test_lang_recursive_rules (expect) {
 
 export function test_lang_recursive_rule_errors (expect) {
   expect(() => {
-    lang`
+    grammar`
       Value = "("
     `
   }).toThrow()
 }
 
 export function test_lang_repeaters (expect) {
-  const list = lang`
+  const list = grammar`
     Expr  = #( Expr* )
           | identifier
   `
   expect(list`(foo bar (baz quux) xyzzy)`)
     .toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
 
-  const nonEmptyList = lang`
+  const nonEmptyList = grammar`
     Expr  = #( Expr+ )
           | identifier
   `
@@ -235,7 +235,7 @@ export function test_lang_repeaters (expect) {
 }
 
 export function test_lang_operator_precedence_assoc (expect) {
-  const math = lang`
+  const math = grammar`
     AddExpr = < . (line? "+") MulExpr > : ${(l, _, r) => l + r}
             | < . (line? "-") MulExpr > : ${(l, _, r) => l - r}
             | MulExpr
@@ -260,13 +260,13 @@ export function test_lang_operator_precedence_assoc (expect) {
 }
 
 export function test_lang_maybe (expect) {
-  const trailingCommas = lang`value "," value ","? : ${(a, _, b) => [a, b]}`
+  const trailingCommas = grammar`value "," value ","? : ${(a, _, b) => [a, b]}`
   expect(trailingCommas`1, 2`).toEqual([1, 2])
   expect(trailingCommas`1, 2,`).toEqual([1, 2])
 }
 
 export function test_lang_with_line_separators (expect) {
-  const lines = lang`value+ ++ line`
+  const lines = grammar`value+ ++ line`
   const text = lines`
     1 2 
   
@@ -276,7 +276,7 @@ export function test_lang_with_line_separators (expect) {
 }
 
 export function test_interpolated_parser (expect) {
-  const num = lang`value`
-  const list = lang`${num}+`
+  const num = grammar`value`
+  const list = grammar`${num}+`
   expect(list`1 2 3`).toEqual([1, 2, 3])
 }

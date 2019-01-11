@@ -21,9 +21,11 @@ const baseTokenizer = moo.states({
     ],
     startToken: ['[', '(', '{'],
     endToken: [']', ')', '}'],
-    punctuation: [',', ';'],
     identifier: { match: /[$_\p{ID_Start}][$\u200C\u200D\p{ID_Continue}]*/ },
-    operator: { match: /[!@#%^&*\-+=|/:<>.?~]+/ },
+    operator: [
+      { match: [',', ';'] },
+      { match: /[!@#%^&*\-+=|/:<>.?~]+/ },
+    ],
   },
   lineComment: {
     ignore: { match: /[^\n]+/ },

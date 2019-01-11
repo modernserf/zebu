@@ -1,2 +1,2 @@
-import { lang } from './visibly-pushdown.mjs'
-export { lang }
+import { grammar } from './visibly-pushdown.mjs'
+export { grammar }

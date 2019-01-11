@@ -1,11 +1,12 @@
-import { lang } from '../index'
+import { grammar } from '../index'
 
 const fromPairs = (pairs = []) =>
   pairs.reduce((obj, [key, value]) => Object.assign(obj, { [key]: value }), {})
 
-export const json = lang`
+export const json = grammar`
   Start = Expr
-  Pair  = value ":" Expr    : ${(k, _, v) => [k, v]}
+  Pair  = value (line? ":" line?) Expr 
+        : ${(k, _, v) => [k, v]}
 
   Expr  = #[ Expr ** "," ]  : ${(xs = []) => xs}
         | #{ Pair ** "," }  : ${fromPairs}

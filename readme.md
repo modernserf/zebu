@@ -97,66 +97,135 @@ url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
 
 ## Writing a language
 
-LLL is a parser generator, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or [Nearley](https://nearley.js.org). With LLL, you define grammars with tagged template literals. Here's a grammar that parses JSON:
+Let's make a configuration language, called SPAML.
 
 ```js
-const fromPairs = (pairs = []) =>
-  pairs.reduce((obj, [key, value]) => Object.assign(obj, { [key]: value }), {})
-const json = lang`
-  Start = Expr
-  Pair  = value ":" Expr    : ${(k, _, v) => [k, v]}
+import { grammar } from "little-language-lab"
 
-  Expr  = #[ Expr ** "," ]  : ${(xs = []) => xs}
-        | #{ Pair ** "," }  : ${fromPairs}
+const spaml = grammar`
+  Block = Pair ** Sep
+        : ${fromPairs}
+  Pair  = Key (":" line?) Expr
+        : ${(key, _, value) => [key, value]}
+  Expr  = #[ Expr ** Sep ]  : ${(xs = []) => xs}
+        | #{ Block }
         | value
         | "true"            : ${() => true}
         | "false"           : ${() => false}
         | "null"            : ${() => null}
+  Key   = identifier | value
+  Sep   = line | ","
+`
+function fromPairs (pairs) {
+  const obj = {}
+  for (const [key, value] of pairs) {
+    obj[key] = value
+  }
+  return obj
+}
+```
+
+You can use the `spaml` grammar like this:
+
+```js
+const justin = spaml`
+  name: "Justin"
+  twitter_handle: "modernserf"
+  hobbies: ["karaoke", "mixology", "programming"]
 `
 ```
 
-This returns a function that, in turn, is used for tagged template literals:
-
+which results in: 
 ```js
-const value = 42
-
-json`{ 
-  "foo": [true, null, -123.45], 
-  "bar": ${42} 
-}`
-// => { foo: [true, null, -123.45], bar: 42 }
-
+{ 
+  name: "Justin", 
+  twitter_handle: "modernserf", 
+  hobbies: ["karaoke", "mixology", "programming"],
+}
 ```
 
-Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, LLL targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). This means that
+How does this work?
 
-
-
-### Vocabulary
-TODO: adapt vocabulary section from nearley https://nearley.js.org/docs/grammar
+TODO: something about tagged template strings
 
 ### Tokenizing
 
-TODO: show how text is tokenized, including removed whitespace, comments, joined operators. emphasize that tokenization is same between the definition language & the generated language
+First, the string components and interpolated values are transformed into tokens:
 
-`line` match a linebreak.
-`value` - match a literal value -- a number or a quoted string -- or an interpolated value
-`identifier` - match a
+```
+  name: "Justin"
+  twitter_handle: "modernserf"
+  hobbies: ["karaoke", "mixology", "programming"]
+```
+
+becomes:
+
+```js
+[
+  { type: 'identifier', value: 'name' },
+  { type: 'operator', value: ':' },
+  { type: 'value', value: 'Justin' },
+  { type: 'line' },
+  { type: 'identifier', value: 'twitter_handle' },
+  { type: 'operator', value: ':' },
+  { type: 'value', value: 'modernserf' },
+  { type: 'line' },
+  { type: 'identifier', value: 'hobbies' },
+  { type: 'operator', value: ':' },
+  { type: 'startToken', value: '[' },
+  { type: 'value', value: 'karaoke' },
+  { type: 'operator', value: ',' },
+  { type: 'value', value: 'mixology' },
+  { type: 'operator', value: ',' },
+  { type: 'value', value: 'programming' },
+  { type: 'endToken', value: ']' },
+]
+```
+
+This process removes whitespace & comments and joins newlines together.
+
+TODO: show how text is tokenized, including removed whitespace, comments, joined operators. emphasize that tokenization is same between the definition language & the generated language
 
 ### Parsing
 
+LLL is a _parser generator_, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or [Nearley](https://nearley.js.org). 
+
+
+With LLL, you define grammars with tagged template literals. Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, LLL is designed for 
+
+
+
+LLL targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). 
+
+
 TODO: examples, three columns: grammar on left, example text in middle, parse tree on right
 
-- `"include"` `"+"` - match a token with this text
-- `Expr` `value` - match tokens that match this rule
-- `exprA | exprB` - try matching `exprA`, else match `exprB`
-- `< . "+" expr > : ${func}` - match a left-associative infix expression, and reduce over `func`
-- `< expr "**" . > : ${func}` - match a right-associative infix expression, and reduce over `func`
-- `exprA exprB : ${func}` - match a sequence of exprA and exprB. if `func` provided, return `func` called with values of all exprs, otherwise return value of first expr
-- `expr ++ separator` - match one or more `expr` separated by `separator`
-- `expr ** separator` - match zero or more `expr` separated by `separator`
+These parsing expressions match a single token:
+- `line`, `value`, `operator`, `identifier` - match a token of this type
+- `"include"` `"+"` - match an operator or identifier token with this value
+
+Parsing expressions can also refer to the rules defined _below_them:
+
+```js
+
+```
+
+These parsing expressions work similarly to regular expressions:
+- `expr1 expr2` - matches expr1 followed by expr2, returning the value of expr1.
+- `expr1 expr2 : ${func}`  matches expr1 followed by expr2. return `func(expr1, expr2)`
+- `expr1 | expr1` - try matching `expr1`, else match `expr2`
 - `expr+` - match one or more expr
 - `expr*` - match zero or more expr
 - `expr?` - match zero or one expr
-- `[ startToken expr endToken : ${func} ]` match `expr` wrapped with `startToken` and `endToken`. This is the only rule that can refer to rules defined above it. if func is provided, return `func(startToken, expr, endToken)`, otherwise return expr
 
+These parsing expressions 
+- `< . "+" expr > : ${func}` - match a left-associative infix expression, and reduce over `func`
+- `< expr "**" . > : ${func}` - match a right-associative infix expression, and reduce over `func`
+- `expr ++ separator` - match one or more `expr` separated by `separator`
+- `expr ** separator` - match zero or more `expr` separated by `separator`
+
+
+These parsing expressions can refer the rules above them, as well:
+- `#( expr )` match `expr` wrapped in parentheses
+- `#[ expr ]` match `expr` wrapped in square brackets
+- `#{ expr }` match `expr` wrapped in curly braces

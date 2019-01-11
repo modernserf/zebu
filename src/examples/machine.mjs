@@ -1,4 +1,4 @@
-import { lang } from '../index'
+import { grammar } from '../index'
 
 const eq = (l, r) => {
   if (l === r) { return true }
@@ -135,7 +135,7 @@ function compile (ds) {
   return store
 }
 
-export const machine = lang`
+export const machine = grammar`
     Program = Declaration+ Rule+ ${(ds, rs) => compile([...ds, ...rs])}
     # TODO: track usage of tagged bindings as states/events
     #       to match top-level declarations

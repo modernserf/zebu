@@ -1,5 +1,5 @@
 /*
-A text parser, using the same basic syntax as `lang`, but for operating on arbitrary strings instead of code in tagged templates.
+A text parser, using the same basic syntax as `grammar`, but for operating on arbitrary strings instead of code in tagged templates.
 
 ## Why is this better than the alternatives?
 
@@ -51,7 +51,7 @@ export function test_match_a_us_phone_number (expect) {
     .toEqual(['+1 (800) 555-1234', '800', null, '555', '1234'])
 }
 
-// Like regular expressions (and unlike `lang`), `text` can find multiple matches in a string.
+// Like regular expressions (and unlike `grammar`), `text` can find multiple matches in a string.
 export function test_find_multiple_results (expect) {
   const pattern = text`... ("fo" | "ba") %letter ...`
   expect([...pattern.matches('hi foo hello bar baz')])

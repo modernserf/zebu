@@ -1,10 +1,10 @@
-import { lang } from '../index'
+import { grammar } from '../index'
 import { lit, seq, alt, repeat, wrappedWith, padded } from '../parse-utils'
 import { createTTS } from '../compiler-utils'
 
 const list = (...xs) => xs
 
-export const op = lang`
+export const op = grammar`
   Program   = (Rule ** line) RootRule?  : ${compile}
   Rule      = Fixity AltExpr            : ${(fixity, operators) => [fixity, operators]}
   Fixity    = "left" | "right" | "pre" | "post"
@@ -21,7 +21,7 @@ const repeatOps = (operatorDefs, fn) => repeat(alt(...operatorDefs.map(fn)))
 const seqLeft = (base, operatorDefs, fn) => seq(applyLeft, base, repeatOps(operatorDefs, fn))
 const seqRight = (operatorDefs, fn, base) => seq(applyRight, repeatOps(operatorDefs, fn), base)
 
-function compile (rules, rootParser = lang`value`) {
+function compile (rules, rootParser = grammar`value`) {
   // apply rules bottom-to-top
   const expr = rules.reduceRight((base, [fixity, operatorDefs]) => {
     switch (fixity) {
@@ -72,7 +72,7 @@ export function test_operator_parser (expect) {
 }
 
 export function test_operator_parser_include (expect) {
-  const expr = lang`
+  const expr = grammar`
     Expr = include ${parent => op`
       left "++" : ${(xs, ys) => xs.concat(ys)}
       root ${parent.RootExpr}

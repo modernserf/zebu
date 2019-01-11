@@ -1,7 +1,7 @@
-import { lang } from '../index'
+import { grammar } from '../index'
 import assert from 'assert'
 
-const xmlisp = lang`
+const xmlisp = grammar`
   Document = Body
   TagBody  = TagHead ("|" line?) Body (line? "|") Tag  
              : ${(obj, _, children, __, closeTag) => { assert.strictEqual(obj.type, closeTag); return { ...obj, children } }}

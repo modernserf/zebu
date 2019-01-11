@@ -1,8 +1,8 @@
-import { lang } from '../../index'
+import { grammar } from '../../index'
 
 const isInt = (x) => x === Math.floor(x)
 
-const time = lang`
+const time = grammar`
   %number ~":" %number (~":" %number) ${(h, m, s = 0) => {
     const isValid = h < 24 && m < 60 && s < 60 &&
       h >= 0 && m >= 0 && s >= 0 &&
@@ -12,7 +12,7 @@ const time = lang`
   }}
 `
 
-const date = lang`
+const date = grammar`
   %number "-" %number "-" %number ${(y, m, d) => {
     const isValid = m <= 12 && d <= 31 &&
       m >= 1 && d >= 1 &&
@@ -22,4 +22,4 @@ const date = lang`
   }}
 `
 
-const dateTime = lang`${date} ${time} ${(date, time) => ({ ...date, ...time })}`
+const dateTime = grammar`${date} ${time} ${(date, time) => ({ ...date, ...time })}`
