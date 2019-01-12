@@ -8,6 +8,7 @@ class InvalidBracketLiteralError extends Error {}
 
 const id = (x) => x
 const _2 = (_, x) => x
+const last = (...xs) => xs.pop()
 const list = (...xs) => xs
 
 const drop = (p) => seq(() => null, p)
@@ -140,7 +141,7 @@ const compiler = createCompiler({
   rightInfix: (xs, fn, ctx, base) =>
     right((p) => alt(seq(fn, ...xs.map(ctx.eval), p), ctx.eval(base))),
   alt: (xs, ctx) => alt(...xs.map(ctx.eval)),
-  seq: (exprs, fn = id, ctx) => seq(fn, ...exprs.map(ctx.eval)),
+  seq: (exprs, fn = last, ctx) => seq(fn, ...exprs.map(ctx.eval)),
   sepByMaybe: (expr, sep, ctx) => {
     sep = ctx.eval(sep)
     return alt(sepBy(

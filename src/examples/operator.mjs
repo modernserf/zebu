@@ -11,7 +11,7 @@ export const op = grammar`
   AltExpr   = Expr ++ line
   Expr      = Pattern ":" value         : ${(pattern, _, mapFn) => ({ pattern, mapFn })}
   Pattern   = value+                    : ${(strs) => padded(seq(list, ...strs.map(lit)))}
-  RootRule  = (line? "root") value      : ${(_, value) => value}
+  RootRule  = line? "root" value
 `
 
 const applyLeft = (first, rest) => rest.reduce((l, fn) => fn(l), first)

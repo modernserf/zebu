@@ -2,7 +2,6 @@ import PropTypes from 'prop-types'
 import { grammar } from '../index'
 
 const pair = (key, _, value) => ({ [key]: value })
-const _2 = (_, x) => x
 const fromPairs = (pairs) => pairs.reduce(Object.assign, {})
 const ifMultiple = (fn) => (xs) => xs.length === 1 ? xs[0] : fn(xs)
 
@@ -14,10 +13,10 @@ export const propTypes = grammar`
   Key       = identifier | value
 
   Expr      = OptExpr ++ "|"        : ${ifMultiple(PropTypes.oneOfType)}
-  OptExpr   = BaseExpr "?"            // proptypes are optional by default
+  OptExpr   = BaseExpr "?"          : ${(type) => type}
             | BaseExpr              : ${(type) => type.isRequired}
   BaseExpr  = #( Expr )
-            | #{ ":" Expr : ${_2} } : ${(expr) => PropTypes.objectOf(expr)}
+            | #{ ":" Expr }         : ${(expr) => PropTypes.objectOf(expr)}
             | #{ Pair ** "," }      : ${(pairs) => PropTypes.shape(fromPairs(pairs))}
             | #[ Expr ]             : ${PropTypes.arrayOf}
             | "instanceof" value    : ${PropTypes.instanceOf}
