@@ -1,5 +1,5 @@
 import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy, left, right } from './parse-utils.mjs'
-import { tag, createCompiler, createTTS } from './compiler-utils'
+import { drop, tag, createCompiler, createTTS } from './compiler-utils'
 
 class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
@@ -11,7 +11,6 @@ const _2 = (_, x) => x
 const last = (...xs) => xs.pop()
 const list = (...xs) => xs
 
-const drop = (p) => seq(() => null, p)
 const dlit = (x) => drop(lit(x))
 const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
 const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
@@ -53,7 +52,7 @@ const postExpr = alt(
   baseExpr
 )
 
-// Expr / "," -> Expr, Expr, Expr ...
+// Expr ** "," -> Expr, Expr, Expr ...
 const sepExpr = alt(
   seq(tag('sepByMaybe'), postExpr, dlit('**'), postExpr),
   seq(tag('sepBy'), postExpr, dlit('++'), postExpr),
@@ -76,11 +75,15 @@ const expr = alt(
   seq(
     tag('altInfix'),
     sepBy(infixExpr, op('|')),
-    drop(op('|')), altExpr,
+    alt(
+      seq(_2, lit('|'), altExpr),
+      nil
+    )
   ),
   altExpr
 )
-const rule = seq(tag('rule'), token('identifier'), dlit('='), expr)
+const ruleName = alt(token('identifier'), lit('...'))
+const rule = seq(tag('rule'), ruleName, dlit('='), expr)
 
 const program = alt(
   seq(tag('program'), wrapIgnoreLines(sepBy(rule, line))),
@@ -112,10 +115,13 @@ const compiler = createCompiler({
   },
   nil: () => createTTS(nil),
   rule: (name, rule, ctx) => {
-    ctx.scope[name] = ctx.eval(rule)
+    ctx.scope.next = ctx.eval(rule)
+    if (name !== '...') {
+      ctx.scope[name] = ctx.scope.next
+    }
   },
   altInfix: (ts, base, ctx) => {
-    base = ctx.eval(base)
+    base = base ? ctx.eval(base) : ctx.scope.next
     const hTag = ts[0][0]
     const asInfixFn = hTag === 'leftInfix' ? asLeftFn : asRightFn
 
@@ -237,19 +243,14 @@ export function test_lang_repeaters (expect) {
 
 export function test_lang_operator_precedence_assoc (expect) {
   const math = grammar`
-    AddExpr = < . (line? "+") MulExpr > : ${(l, _, r) => l + r}
-            | < . (line? "-") MulExpr > : ${(l, _, r) => l - r}
-            | MulExpr
-    MulExpr = < . (line? "*") PowNeg >  : ${(l, _, r) => l * r}
-            | < . (line? "/") PowNeg >  : ${(l, _, r) => l / r}
-            | PowNeg
-    PowNeg  = NegExpr 
-            | PowExpr
-    NegExpr = "-" Expr                  : ${(_, x) => -x}
-    PowExpr = < Expr (line? "**") . >   : ${(l, _, r) => l ** r}
-            | Expr
-    Expr    = #( AddExpr ) 
-            | value
+    Expr  = < . (line? "+") next >  : ${(l, _, r) => l + r}
+          | < . (line? "-") next >  : ${(l, _, r) => l - r}
+    ...   = < . (line? "*") next >  : ${(l, _, r) => l * r}
+          | < . (line? "/") next >  : ${(l, _, r) => l / r}
+    ...   = < next (line? "**") . > : ${(l, _, r) => l ** r}
+    ...   = < "-" . >               : ${(_, x) => -x}
+    ...   = #( Expr ) 
+          | value
   `
   expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
   expect(math`3 * (4 / 5) * 6`).toEqual(3 * (4 / 5) * 6)

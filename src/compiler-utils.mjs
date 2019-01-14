@@ -1,8 +1,10 @@
-import { parse, padded } from './parse-utils'
+import { seq, parse, padded } from './parse-utils'
 import { tokenize } from './token-utils'
 
-const notNull = (x) => x !== null
-export const tag = (type) => (...values) => [type, ...values.filter(notNull)]
+const DROP = {}
+const notDropped = (x) => x !== DROP
+export const drop = (parser) => seq(() => DROP, parser)
+export const tag = (type) => (...values) => [type, ...values.filter(notDropped)]
 
 export function createCompiler (model) {
   return (ast) => {
