@@ -74,14 +74,13 @@ const matches = {
 
 function skeletonize (tokens) {
   const stack = [{ value: [], startToken: 'start' }]
-  let isConsolidatingLines = false
   for (const tok of tokens) {
     if (tok.type === 'ignore') { continue }
     if (tok.type === 'line') {
-      if (isConsolidatingLines) { continue }
-      isConsolidatingLines = true
+      const top = stack[stack.length - 1]
+      const lastToken = top.value[top.value.length - 1]
+      if (lastToken && lastToken.type === 'line') { continue }
     }
-    isConsolidatingLines = false
 
     if (tok.type === 'startToken') {
       stack.push({
