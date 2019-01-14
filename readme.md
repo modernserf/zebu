@@ -267,19 +267,11 @@ With Zebu, you define grammars with tagged template literals. Like [Owl](https:/
 Zebu targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). 
 
 
-TODO: examples, three columns: grammar on left, example text in middle, parse tree on right
-
 These parsing expressions match a single token:
 - `line`, `value`, `operator`, `identifier` - match a token of this type
 - `"include"` `"+"` - match an operator or identifier token with this value
 
-Parsing expressions can also refer to the rules defined _below_them:
-
-```js
-
-```
-
-These parsing expressions work similarly to regular expressions:
+These parsing expressions work similarly to regular expressions, and can refer to the rules defined below them:
 - `expr1 expr2` - matches expr1 followed by expr2, returning the value of expr2.
 - `expr1 expr2 : ${func}`  matches expr1 followed by expr2. return `func(expr1, expr2)`
 - `expr1 | expr1` - try matching `expr1`, else match `expr2`
@@ -287,12 +279,12 @@ These parsing expressions work similarly to regular expressions:
 - `expr*` - match zero or more expr
 - `expr?` - match zero or one expr
 
-These parsing expressions are useful for
+These parsing expressions are useful for matching simple operator expressions, or lists with separators, and can refer to the rules defined below them:
 - `expr ++ separator` - match one or more `expr` separated by `separator`
 - `expr ** separator` - match zero or more `expr` separated by `separator`, returning a list of `expr` values.
 
-
-These parsing expressions can refer the rules above them, as well:
+These parsing expressions match expressions wrapped in bracketing punctuation. Unlike the other parsing expressions, these can also refer to rules defined _above_ them:
 - `#( expr )` match `expr` wrapped in parentheses
 - `#[ expr ]` match `expr` wrapped in square brackets
 - `#{ expr }` match `expr` wrapped in curly braces
+

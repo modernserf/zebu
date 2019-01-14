@@ -8,12 +8,13 @@ import * as rangeExample from './examples/range'
 import * as propTypesExample from './examples/prop-types'
 import * as matrixExample from './examples/matrix'
 import * as xmlExample from './examples/xmlish'
+import * as ifExample from './examples/interactive-fiction'
 import * as nondet from './nondet'
 
 const modules = [
   parseUtils, tokenUtils, visiblyPushdown, nondet, operator,
   jsonExample, rangeExample, propTypesExample, matrixExample,
-  xmlExample,
+  xmlExample, ifExample,
 ]
 
 const expect = (value) => ({
