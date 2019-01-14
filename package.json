@@ -1,16 +1,22 @@
 {
-  "name": "little-language-lab",
+  "name": "zebu",
   "version": "0.0.1",
   "description": "",
   "keywords": [],
   "author": "Justin Falcone <justin@justinfalcone.com>",
   "license": "ISC",
-  "main": "index.build.js",
-  "module": "src/index.mjs",
+  "main": "main.build.js",
+  "module": "module.build.js",
+  "files": [
+    "main.build.js",
+    "module.build.js"
+  ],
   "scripts": {
     "lint": "eslint .",
     "test": "node --experimental-modules src/test.mjs | faucet",
-    "build:cjs": "rollup src/index.js -o index.build.js -f cjs",
+    "build:cjs": "rollup src/index.mjs -o main.build.js -f cjs",
+    "build:es": "rollup src/index.mjs -o module.build.js -f es",
+    "build": "npm run build:cjs && npm run build:es",
     "watch:test": "watch 'npm test' ./src"
   },
   "devDependencies": {

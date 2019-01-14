@@ -1,12 +1,12 @@
-# Little Language Lab
+# Zebu
 
 ## What is this?
 
-LLL is JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) that use [tagged template literals](http://2ality.com/2016/11/computing-tag-functions.html).
+Zebu is a JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) that use [tagged template literals](http://2ality.com/2016/11/computing-tag-functions.html).
 
-## Little Languages built with LLL
+## Little Languages built with Zebu
 
-### [Ranges](https://github.com/modernserf/little-language-lab/blob/master/src/examples/range.mjs) 
+### [Ranges](https://github.com/modernserf/zebu/blob/master/src/examples/range.mjs) 
 ```js
 range`1,3 ... (10)` // => yields 1, 3, 5, 7, 9
 ```
@@ -16,7 +16,7 @@ range`1,3 ... (10)` // => yields 1, 3, 5, 7, 9
 dx`.foo.bar`.replace({ foo: { bar: 3 } }, 5) // => { foo: { bar: 5 } }
 ```
 
-### [React PropTypes](https://github.com/modernserf/little-language-lab/blob/master/src/examples/prop-types.mjs)
+### [React PropTypes](https://github.com/modernserf/zebu/blob/master/src/examples/prop-types.mjs)
 ```js
 const types = propTypes`
   className: string?
@@ -39,7 +39,7 @@ const types = propTypes`
 } */
 ```
 
-### [Matrix math operations](https://github.com/modernserf/little-language-lab/blob/master/src/examples/matrix.mjs)
+### [Matrix math operations](https://github.com/modernserf/zebu/blob/master/src/examples/matrix.mjs)
 ```js
 const x = [
   [7, 1],
@@ -82,13 +82,13 @@ const url = text`
   Anchor    = "#" Component           : ${(_, target) => target}
   Component = ${/[A-Za-z0-9()_\-~]/}  : ${decodeURIComponent}
 `
-url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
+url.match("https://github.com/modernserf/zebu?foo=bar20baz"/)
 /* => { 
   ok: true, 
   value: {
     protocol: "https",
     host: ["github", "com"],
-    path: ["modernserf", "little-language-lab"],
+    path: ["modernserf", "zebu"],
     search: { foo: "bar baz" },
     anchor: null,
   },
@@ -97,10 +97,10 @@ url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
 
 ## Writing a language
 
-LLL exports the function `grammar` that is used to define the rules for interpreting a language. Let's use `grammar` to make a yaml-like configuration language, called "spaml":
+Zebu exports the function `grammar` that is used to define the rules for interpreting a language. Let's use `grammar` to make a yaml-like configuration language, called "spaml":
 
 ```js
-import { grammar } from "little-language-lab"
+import { grammar } from "zebu"
 
 const spaml = grammar`
   Block = Pair ** Sep           : ${fromPairs}
@@ -257,14 +257,14 @@ const spaml = grammar`
 
 
 
-LLL is a _parser generator_, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or [Nearley](https://nearley.js.org). 
+Zebu is a _parser generator_, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or [Nearley](https://nearley.js.org). 
 
 
-With LLL, you define grammars with tagged template literals. Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, LLL is designed for 
+With Zebu, you define grammars with tagged template literals. Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, Zebu is designed for 
 
 
 
-LLL targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). 
+Zebu targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). 
 
 
 TODO: examples, three columns: grammar on left, example text in middle, parse tree on right
