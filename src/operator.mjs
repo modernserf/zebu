@@ -1,6 +1,6 @@
-import { grammar } from '../index'
-import { lit, seq, alt, repeat, wrappedWith, padded } from '../parse-utils'
-import { createTTS } from '../compiler-utils'
+import { grammar } from './visibly-pushdown'
+import { lit, seq, alt, repeat, wrappedWith, padded, token } from './parse-utils'
+import { createTTS } from './compiler-utils'
 
 const list = (...xs) => xs
 
@@ -9,19 +9,27 @@ export const op = grammar`
   Rule      = Fixity AltExpr            : ${(fixity, operators) => [fixity, operators]}
   Fixity    = "left" | "right" | "pre" | "post"
   AltExpr   = Expr ++ line
-  Expr      = Pattern ":" value         : ${(pattern, _, mapFn) => ({ pattern, mapFn })}
-  Pattern   = value+                    : ${(strs) => padded(seq(list, ...strs.map(lit)))}
+  Expr      = Pattern ":" value         : ${(pattern, _, mapFn) => ({ ...pattern, mapFn })}
+  Pattern   = value+                    : ${processPattern}
   RootRule  = line? "root" value
 `
+
+function processPattern (strs) {
+  return ({
+    length: strs.length,
+    pattern: padded(seq(list, ...strs.map(lit))),
+  })
+}
 
 const applyLeft = (first, rest) => rest.reduce((l, fn) => fn(l), first)
 const applyRight = (most, last) => most.reduceRight((r, fn) => fn(r), last)
 
-const repeatOps = (operatorDefs, fn) => repeat(alt(...operatorDefs.map(fn)))
+const longestFirst = (operatorDefs) => [...operatorDefs].sort((l, r) => r.length - l.length)
+const repeatOps = (operatorDefs, fn) => repeat(alt(...longestFirst(operatorDefs).map(fn)))
 const seqLeft = (base, operatorDefs, fn) => seq(applyLeft, base, repeatOps(operatorDefs, fn))
 const seqRight = (operatorDefs, fn, base) => seq(applyRight, repeatOps(operatorDefs, fn), base)
 
-function compile (rules, rootParser = grammar`value`) {
+function compile (rules, rootParser = token('value')) {
   // apply rules bottom-to-top
   const expr = rules.reduceRight((base, [fixity, operatorDefs]) => {
     switch (fixity) {
@@ -82,4 +90,15 @@ export function test_operator_parser_include (expect) {
   `
   expect(expr`["foo", "bar"] ++ ["baz"]`)
     .toEqual(['foo', 'bar', 'baz'])
+}
+
+export function test_try_longest_match_first (expect) {
+  const eq = op`
+    left  "is"        : ${(l, r) => l === r}
+          "is" "not"  : ${(l, r) => l !== r}
+    pre   "not"       : ${(l) => !l}
+  `
+  expect(eq`4 is 4`).toEqual(true)
+  expect(eq`4 is not 3`).toEqual(true)
+  expect(eq`4 is (not 3)`).toEqual(false)
 }

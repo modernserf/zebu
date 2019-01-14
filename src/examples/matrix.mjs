@@ -1,6 +1,5 @@
 import math from 'mathjs' // NOTE: this takes a noticeably long time (~1s) to import!
-import { grammar } from '../index'
-import { op } from './operator'
+import { grammar, op } from '../index'
 
 const matrix = grammar`
   Main = Expr

@@ -12,10 +12,10 @@ export const propTypes = grammar`
   Pair  = Key ":" Expr          : ${pair}
   Key   = identifier | value
 
-  Expr  = next ++ "|"           : ${ifMultiple(PropTypes.oneOfType)}
-  ...   = next "?"              : ${(type) => type}
-        | next                  : ${(type) => type.isRequired}
-  ...   = #( Expr )
+  Expr  = Opt ++ "|"            : ${ifMultiple(PropTypes.oneOfType)}
+  Opt   = Base "?"              : ${(type) => type}
+        | Base                  : ${(type) => type.isRequired}
+  Base   = #( Expr )
         | #{ ":" Expr }         : ${(expr) => PropTypes.objectOf(expr)}
         | #{ Pair ** "," }      : ${(pairs) => PropTypes.shape(fromPairs(pairs))}
         | #[ Expr ]             : ${PropTypes.arrayOf}

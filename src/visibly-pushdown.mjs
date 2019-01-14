@@ -1,9 +1,7 @@
-import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy, left, right } from './parse-utils.mjs'
+import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy } from './parse-utils.mjs'
 import { drop, tag, createCompiler, createTTS } from './compiler-utils'
 
-class MismatchedOperatorExpressionError extends Error {}
 class UnknownRuleError extends Error {}
-class ScopeNotDefinedError extends Error {}
 class InvalidBracketLiteralError extends Error {}
 
 const id = (x) => x
@@ -12,8 +10,6 @@ const last = (...xs) => xs.pop()
 const list = (...xs) => xs
 
 const dlit = (x) => drop(lit(x))
-const asLeftFn = (fn) => (...xs) => (acc) => fn(acc, ...xs)
-const asRightFn = (fn) => (...xs) => (acc) => fn(...xs, acc)
 
 const line = token('line')
 const ignoreLines = drop(alt(line, nil))
@@ -63,27 +59,8 @@ const seqExpr = seq(
   repeat(sepExpr, 1), alt(seq(_2, ignoreLines, mapFn), nil)
 )
 
-const altExpr = seq(tag('alt'), sepBy(seqExpr, op('|')))
-// AddExpr = < . "+" MultExpr >
-const infixExpr = alt(
-  seq(tag('leftInfix'),
-    dlit('<'), dlit('.'), repeat(sepExpr, 1), dlit('>'), mapFn),
-  seq(tag('rightInfix'),
-    dlit('<'), repeat(sepExpr, 1), dlit('.'), dlit('>'), mapFn),
-)
-const expr = alt(
-  seq(
-    tag('altInfix'),
-    sepBy(infixExpr, op('|')),
-    alt(
-      seq(_2, lit('|'), altExpr),
-      nil
-    )
-  ),
-  altExpr
-)
-const ruleName = alt(token('identifier'), lit('...'))
-const rule = seq(tag('rule'), ruleName, dlit('='), expr)
+const expr = seq(tag('alt'), sepBy(seqExpr, op('|')))
+const rule = seq(tag('rule'), token('identifier'), dlit('='), expr)
 
 const program = alt(
   seq(tag('program'), wrapIgnoreLines(sepBy(rule, line))),
@@ -115,37 +92,8 @@ const compiler = createCompiler({
   },
   nil: () => createTTS(nil),
   rule: (name, rule, ctx) => {
-    ctx.scope.next = ctx.eval(rule)
-    if (name !== '...') {
-      ctx.scope[name] = ctx.scope.next
-    }
+    ctx.scope[name] = ctx.eval(rule)
   },
-  altInfix: (ts, base, ctx) => {
-    base = base ? ctx.eval(base) : ctx.scope.next
-    const hTag = ts[0][0]
-    const asInfixFn = hTag === 'leftInfix' ? asLeftFn : asRightFn
-
-    const seqs = []
-    for (const [tTag, tSeq, tFn] of ts) {
-      if (tTag !== hTag) { throw new MismatchedOperatorExpressionError(tag) }
-      seqs.push(seq(asInfixFn(tFn), ...tSeq.map(ctx.eval)))
-    }
-    if (hTag === 'leftInfix') {
-      return seq(
-        (init, fns) => fns.reduce((acc, fn) => fn(acc), init),
-        base, repeat(alt(...seqs), 0)
-      )
-    } else {
-      return seq(
-        (fns, init) => fns.reduceRight((acc, fn) => fn(acc), init),
-        repeat(alt(...seqs), 0), base
-      )
-    }
-  },
-  leftInfix: (xs, fn, ctx, base) =>
-    left(fn, ctx.eval(base), ...xs.map(ctx.eval)),
-  rightInfix: (xs, fn, ctx, base) =>
-    right((p) => alt(seq(fn, ...xs.map(ctx.eval), p), ctx.eval(base))),
   alt: (xs, ctx) => alt(...xs.map(ctx.eval)),
   seq: (exprs, fn = last, ctx) => seq(fn, ...exprs.map(ctx.eval)),
   sepByMaybe: (expr, sep, ctx) => {
@@ -175,7 +123,6 @@ const compiler = createCompiler({
     '{', () => wrapIgnoreLines(ctx.eval(content)), '}'
   ),
   identifier: (name, ctx) => {
-    if (!ctx.scope) { throw new ScopeNotDefinedError(name) }
     const rule = ctx.scope[name]
     if (!rule) {
       throw new UnknownRuleError(name)
@@ -185,7 +132,7 @@ const compiler = createCompiler({
   include: (getParser, ctx) => getParser(ctx.scope),
   literal: (value) => {
     if (value && value.parse) { return value }
-    if (/[(){}[\]]/.test(value)) { throw new InvalidBracketLiteralError() }
+    if (/[(){}[\]]/.test(value)) { throw new InvalidBracketLiteralError(value) }
     return lit(value)
   },
 })
@@ -239,26 +186,6 @@ export function test_lang_repeaters (expect) {
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`)
     .toEqual(['foo', 'bar', ['baz', 'quux'], 'xyzzy'])
   expect(() => nonEmptyList`()`).toThrow()
-}
-
-export function test_lang_operator_precedence_assoc (expect) {
-  const math = grammar`
-    Expr  = < . (line? "+") next >  : ${(l, _, r) => l + r}
-          | < . (line? "-") next >  : ${(l, _, r) => l - r}
-    ...   = < . (line? "*") next >  : ${(l, _, r) => l * r}
-          | < . (line? "/") next >  : ${(l, _, r) => l / r}
-    ...   = < next (line? "**") . > : ${(l, _, r) => l ** r}
-    ...   = < "-" . >               : ${(_, x) => -x}
-    ...   = #( Expr ) 
-          | value
-  `
-  expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
-  expect(math`3 * (4 / 5) * 6`).toEqual(3 * (4 / 5) * 6)
-  expect(math`1 
-    + 2 
-    * 3 
-    - 4`).toEqual(1 + (2 * 3) - 4)
-  expect(math`2 ** 3 ** 2`).toEqual(2 ** (3 ** 2))
 }
 
 export function test_lang_maybe (expect) {

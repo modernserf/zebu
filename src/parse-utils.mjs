@@ -314,35 +314,6 @@ export function test_wrappedWith (expect) {
   expect(parse(parser, tokens)).toEqual('foo')
 }
 
-// A = A B | C -> A = C B*
-const list = (...xs) => xs
-export const left = (mapFn, baseCase, ...iterCases) =>
-  seq(
-    (base, iters) => iters.reduce((acc, xs) => mapFn(acc, ...xs), base),
-    baseCase, repeat(seq(list, ...iterCases))
-  )
-
-export const right = (getParser) => {
-  const p = new LazyParser(() => getParser(p))
-  return p
-}
-
-export function test_left_recursion (expect) {
-  const tokens = [
-    $t('number', 1),
-    $t('identifier', '/'),
-    $t('number', 2),
-    $t('identifier', '/'),
-    $t('number', 3),
-  ]
-  const num = token('number')
-  const parser = left(
-    (left, _, right) => left / right,
-    num, lit('/'), num,
-  )
-  expect(parse(parser, tokens)).toEqual(1 / 2 / 3)
-}
-
 const line = token('line')
 export const padded = (parser) =>
   seq((_, x) => x, alt(line, nil), parser, alt(line, nil))
