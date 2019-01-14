@@ -1,5 +1,7 @@
 import moo from './moo.mjs'
 
+class BracketMismatchError extends Error {}
+
 const trimQuotes = str => str.slice(1, -1).replace(/\\(.)/g, '$1')
 const toNumber = (str) => Number(str.replace(/_/g, ''))
 
@@ -47,6 +49,7 @@ export function tokenize (strs, interpolations) {
   return skeletonize(tokenizeWithInterpolations(strs, interpolations))
 }
 
+// TODO: what does line/col mean when we reset the tokenizer on substri
 function * tokenizeWithInterpolations (strs, interpolations) {
   let lastState
   for (const str of strs) {
@@ -56,14 +59,21 @@ function * tokenizeWithInterpolations (strs, interpolations) {
       let value = interpolations.shift()
       // don't yield interpolated values in comments
       if (lastState.state === 'main') {
-        yield { type: 'value', value }
+        yield { type: 'value', value, line: lastState.line, col: lastState.col }
       }
     }
   }
 }
 
+const matches = {
+  ']': '[',
+  '}': '{',
+  ')': '(',
+  'end': 'start',
+}
+
 function skeletonize (tokens) {
-  const stack = [{ value: [] }]
+  const stack = [{ value: [], startToken: 'start' }]
   let isConsolidatingLines = false
   for (const tok of tokens) {
     if (tok.type === 'ignore') { continue }
@@ -82,9 +92,12 @@ function skeletonize (tokens) {
         col: tok.col,
         startToken: tok.value,
       })
-    // TODO: match
     } else if (tok.type === 'endToken') {
       const structure = stack.pop()
+      if (matches[tok.value] !== structure.startToken) {
+        throw new BracketMismatchError(tok)
+      }
+
       structure.endToken = tok.value
       const top = stack[stack.length - 1]
       top.value.push(structure)
@@ -92,7 +105,7 @@ function skeletonize (tokens) {
       stack[stack.length - 1].value.push(tok)
     }
   }
-  if (stack.length !== 1) { throw new Error('unbalanced brackets') }
-  // TODO: error handling
-  return stack[0].value
+  const result = stack.pop()
+  if (result.startToken !== 'start') { throw new BracketMismatchError() }
+  return result.value
 }

@@ -97,22 +97,20 @@ url.match("https://github.com/modernserf/little-language-lab?foo=bar20baz"/)
 
 ## Writing a language
 
-Let's make a configuration language, called SPAML.
+LLL exports the function `grammar` that is used to define the rules for interpreting a language. Let's use `grammar` to make a yaml-like configuration language, called "spaml":
 
 ```js
 import { grammar } from "little-language-lab"
 
 const spaml = grammar`
-  Block = Pair ** Sep
-        : ${fromPairs}
-  Pair  = Key (":" line?) Expr
-        : ${(key, _, value) => [key, value]}
-  Expr  = #[ Expr ** Sep ]  : ${(xs = []) => xs}
+  Block = Pair ** Sep           : ${fromPairs}
+  Pair  = Key (":" line?) Expr  : ${(key, _, value) => [key, value]}
+  Expr  = #[ Expr ** Sep ]      : ${(xs = []) => xs}
         | #{ Block }
         | value
-        | "true"            : ${() => true}
-        | "false"           : ${() => false}
-        | "null"            : ${() => null}
+        | "true"                : ${() => true}
+        | "false"               : ${() => false}
+        | "null"                : ${() => null}
   Key   = identifier | value
   Sep   = line | ","
 `
@@ -146,7 +144,9 @@ which results in:
 
 How does this work?
 
-TODO: something about tagged template strings
+`grammar` and `spaml` are both functions that work with tagged template literals.
+
+TODO: something about tagged template literals
 
 ### Tokenizing
 
@@ -182,11 +182,80 @@ becomes:
 ]
 ```
 
-This process removes whitespace & comments and joins newlines together.
+Some text, like tabs and spaces, are removed altogether. JS-style comments (both `//` line comments and `/* */` block) are also removed. If there are multiple newlines in a row, they are consolidated into a single `line` token; any opening and closing lines are removed as well.
 
-TODO: show how text is tokenized, including removed whitespace, comments, joined operators. emphasize that tokenization is same between the definition language & the generated language
+Numbers and quoted strings become `value` tokens; all interpolated values are inserted as `value` tokens as well. Words that match JavaScript's rules for identifiers become `identifier` tokens. Most punctuation becomes `operator` tokens. 
+
+Grouping symbols `( ) [ ] { }` are specially handled and become `startToken` and `endToken`, and these have a special purpose in the next stage of processing.
+
+### Skeleton syntax trees
+
+Next, the grouping tokens are matched, and the tokens between them are collected into a single `structure` token:
+
+```js
+[
+  { type: 'identifier', value: 'name' },
+  { type: 'operator', value: ':' },
+  { type: 'value', value: 'Justin' },
+  { type: 'line' },
+  { type: 'identifier', value: 'twitter_handle' },
+  { type: 'operator', value: ':' },
+  { type: 'value', value: 'modernserf' },
+  { type: 'line' },
+  { type: 'identifier', value: 'hobbies' },
+  { type: 'operator', value: ':' },
+  { type: 'structure', structureType: '[]', value: [
+    { type: 'value', value: 'karaoke' },
+    { type: 'operator', value: ',' },
+    { type: 'value', value: 'mixology' },
+    { type: 'operator', value: ',' },
+    { type: 'value', value: 'programming' },
+  ] }
+]
+```
+
+Most parsers don't have this step, but this means that the next step can be much simpler.
 
 ### Parsing
+
+In the next step, we try to match the tokens to the top rule of the grammar. 
+
+```js
+const spaml = grammar`
+  Block = Pair ** Sep           : ${fromPairs}
+  Pair  = Key (":" line?) Expr  : ${(key, _, value) => [key, value]}
+  Expr  = #[ Expr ** Sep ]      : ${(xs = []) => xs}
+        | #{ Block }
+        | value
+        | "true"                : ${() => true}
+        | "false"               : ${() => false}
+        | "null"                : ${() => null}
+  Key   = identifier | value
+  Sep   = line | ","
+`
+```
+
+```
+(Block
+  (Pair 
+    (Key (identifier "name")) 
+    (Expr (value "Justin")))
+  (Pair 
+    (Key (identifier "twitter_handle")) 
+    (Expr (value "modernserf")))
+  (Pair 
+    (Key (identifier "hobbies")) 
+    (Expr [
+      (Expr (value "karaoke"))
+      (Expr (value "mixology"))
+      (Expr (value "programming"))
+    ])))
+```
+
+
+
+
+
 
 LLL is a _parser generator_, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or [Nearley](https://nearley.js.org). 
 
