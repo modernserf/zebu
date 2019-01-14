@@ -4,6 +4,7 @@ import * as parseUtils from './parse-utils'
 import * as tokenUtils from './token-utils'
 import * as visiblyPushdown from './visibly-pushdown'
 import * as jsonExample from './examples/json'
+import * as rangeExample from './examples/range'
 import * as propTypesExample from './examples/prop-types'
 import * as matrixExample from './examples/matrix'
 import * as xmlExample from './examples/xmlish'
@@ -11,7 +12,7 @@ import * as nondet from './nondet'
 
 const modules = [
   parseUtils, tokenUtils, visiblyPushdown, nondet, operator,
-  jsonExample, propTypesExample, matrixExample,
+  jsonExample, rangeExample, propTypesExample, matrixExample,
   xmlExample,
 ]
 

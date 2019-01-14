@@ -2,7 +2,7 @@
 
 ## What is this?
 
-Zebu is a JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) that use [tagged template literals](http://2ality.com/2016/11/computing-tag-functions.html).
+Zebu is a JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) with [tagged template literals](http://2ality.com/2016/11/computing-tag-functions.html).
 
 ## Little Languages built with Zebu
 
@@ -280,18 +280,16 @@ Parsing expressions can also refer to the rules defined _below_them:
 ```
 
 These parsing expressions work similarly to regular expressions:
-- `expr1 expr2` - matches expr1 followed by expr2, returning the value of expr1.
+- `expr1 expr2` - matches expr1 followed by expr2, returning the value of expr2.
 - `expr1 expr2 : ${func}`  matches expr1 followed by expr2. return `func(expr1, expr2)`
 - `expr1 | expr1` - try matching `expr1`, else match `expr2`
 - `expr+` - match one or more expr
 - `expr*` - match zero or more expr
 - `expr?` - match zero or one expr
 
-These parsing expressions 
-- `< . "+" expr > : ${func}` - match a left-associative infix expression, and reduce over `func`
-- `< expr "**" . > : ${func}` - match a right-associative infix expression, and reduce over `func`
+These parsing expressions are useful for
 - `expr ++ separator` - match one or more `expr` separated by `separator`
-- `expr ** separator` - match zero or more `expr` separated by `separator`
+- `expr ** separator` - match zero or more `expr` separated by `separator`, returning a list of `expr` values.
 
 
 These parsing expressions can refer the rules above them, as well:
