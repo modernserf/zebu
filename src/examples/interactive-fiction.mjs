@@ -1,5 +1,4 @@
 import { grammar } from '../index'
-import { promises } from 'fs'
 
 const withIndex = (xs) => xs.map((x, index) => ({ ...x, index }))
 

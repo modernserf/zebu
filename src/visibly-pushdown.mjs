@@ -7,7 +7,6 @@ class InvalidBracketLiteralError extends Error {}
 const id = (x) => x
 const _2 = (_, x) => x
 const last = (...xs) => xs.pop()
-const list = (...xs) => xs
 
 const dlit = (x) => drop(lit(x))
 
@@ -20,9 +19,6 @@ const mapFn = seq(_2, dlit(':'), token('value'))
 
 const baseExpr = alt(
   wrappedWith('(', () => expr, ')'),
-  seq(tag('wrapped'), wrappedWith(
-    '[', () => seq(list, token('value'), sepExpr, token('value')), ']'
-  )),
   seq(tag('wrappedParen'),
     dlit('#'),
     wrappedWith('(', () => expr, ')')
@@ -131,7 +127,6 @@ const compiler = createCompiler({
   },
   include: (getParser, ctx) => getParser(ctx.scope),
   literal: (value) => {
-    if (value && value.parse) { return value }
     if (/[(){}[\]]/.test(value)) { throw new InvalidBracketLiteralError(value) }
     return lit(value)
   },
@@ -206,6 +201,6 @@ export function test_lang_with_line_separators (expect) {
 
 export function test_interpolated_parser (expect) {
   const num = grammar`value`
-  const list = grammar`${num}+`
+  const list = grammar`(include ${() => num})+`
   expect(list`1 2 3`).toEqual([1, 2, 3])
 }
