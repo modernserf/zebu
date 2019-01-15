@@ -272,16 +272,16 @@ These parsing expressions match a single token:
 - `"include"` `"+"` - match an operator or identifier token with this value
 
 These parsing expressions work similarly to regular expressions, and can refer to the rules defined below them:
-- `expr1 expr2` - matches expr1 followed by expr2, returning the value of expr2.
-- `expr1 expr2 : ${func}`  matches expr1 followed by expr2. return `func(expr1, expr2)`
+- `expr1 expr2` - matches expr1 followed by `expr2`, returning the result of `expr2`
+- `expr1 expr2 : ${func}`  matches `expr1` followed by `expr2`, returning `func(expr1, expr2)`
 - `expr1 | expr1` - try matching `expr1`, else match `expr2`
-- `expr+` - match one or more expr
-- `expr*` - match zero or more expr
-- `expr?` - match zero or one expr
+- `expr+` - match one or more expr, returning a list of `expr` results
+- `expr*` - match zero or more expr, returning a list of `expr` results
+- `expr?` - match zero or one expr, returning null or `expr` result
 
-These parsing expressions are useful for matching simple operator expressions, or lists with separators, and can refer to the rules defined below them:
+These parsing expressions are useful for matching simple operator expressions, or lists with separators, and can refer to the rules defined below them. They both return lists of `expr` results.
 - `expr ++ separator` - match one or more `expr` separated by `separator`
-- `expr ** separator` - match zero or more `expr` separated by `separator`, returning a list of `expr` values.
+- `expr ** separator` - match zero or more `expr` separated by `separator`, with an optional trailing `separator`
 
 These parsing expressions match expressions wrapped in bracketing punctuation. Unlike the other parsing expressions, these can also refer to rules defined _above_ them:
 - `#( expr )` match `expr` wrapped in parentheses

@@ -5,7 +5,7 @@ const fromPairs = (pairs = []) =>
 
 export const json = grammar`
   Start = Expr
-  Pair  = value (line? ":" line?) Expr 
+  Pair  = (value | identifier) (line? ":" line?) Expr 
         : ${(k, _, v) => [k, v]}
 
   Expr  = #[ Expr ** "," ]  : ${(xs = []) => xs}
@@ -22,9 +22,11 @@ export function test_json (expect) {
   expect(json` 123.45 `).toEqual(123.45)
   expect(json` "foo" `).toEqual('foo')
   expect(json`[]`).toEqual([])
+  // note: this is json5 -- allows comments, trailing commas, ident keys
   expect(json`[
+    // a comment
     "foo",
-    "bar"
+    "bar",
   ]`).toEqual(['foo', 'bar'])
-  expect(json`{"x": {"y": {}}}`).toEqual({ x: { y: {} } })
+  expect(json`{"x": {y: {}}}`).toEqual({ x: { y: {} } })
 }

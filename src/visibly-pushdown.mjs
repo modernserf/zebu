@@ -94,10 +94,17 @@ const compiler = createCompiler({
   seq: (exprs, fn = last, ctx) => seq(fn, ...exprs.map(ctx.eval)),
   sepByMaybe: (expr, sep, ctx) => {
     sep = ctx.eval(sep)
-    return alt(sepBy(
-      ctx.eval(expr),
-      seq(id, alt(sep, seq(_2, ignoreLines, sep)), ignoreLines)
-    ), seq(() => [], nil))
+    return alt(
+      seq((xs) => xs,
+        sepBy(
+          ctx.eval(expr),
+          seq(id, alt(sep, seq(_2, ignoreLines, sep)), ignoreLines)
+        ),
+        alt(ignoreLines, nil),
+        alt(sep, nil)
+      ),
+      seq(() => [], nil)
+    )
   },
   sepBy: (expr, sep, ctx) => {
     sep = ctx.eval(sep)
