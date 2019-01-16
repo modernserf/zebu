@@ -9,12 +9,14 @@ import * as propTypesExample from './examples/prop-types'
 import * as matrixExample from './examples/matrix'
 import * as xmlExample from './examples/xmlish'
 import * as ifExample from './examples/interactive-fiction'
+import * as selfHostingExample from './examples/itself'
+import * as datExExample from './examples/data-expressions'
 import * as nondet from './nondet'
 
 const modules = [
   parseUtils, tokenUtils, visiblyPushdown, nondet, operator,
   jsonExample, rangeExample, propTypesExample, matrixExample,
-  xmlExample, ifExample,
+  xmlExample, ifExample, selfHostingExample, datExExample,
 ]
 
 const expect = (value) => ({
