@@ -134,6 +134,7 @@ const compiler = createCompiler({
   },
   include: (getParser, ctx) => getParser(ctx.scope),
   literal: (value) => {
+    if (value.parse) { return value }
     if (/[(){}[\]]/.test(value)) { throw new InvalidBracketLiteralError(value) }
     return lit(value)
   },
