@@ -11,7 +11,7 @@ Zebu is a JavaScript library for building [little languages](http://staff.um.edu
 range`1,3 ... (10)` // => yields 1, 3, 5, 7, 9
 ```
 
-### [Data expressions](http://justinfalcone.com/data-expressions/)
+### [Data expressions](https://github.com/modernserf/zebu/blob/master/src/examples/data-expressions.mjs)
 ```js
 dx`.foo.bar`.replace({ foo: { bar: 3 } }, 5) // => { foo: { bar: 5 } }
 ```
