@@ -1,3 +1,73 @@
+const atSubject = ({ tokens, index }) => {
+  const pre = tokens.slice(index - 3, index).join(' ')
+  const post = tokens.slice(index + 1, index + 4).join(' ')
+  const target = String(tokens[index] || '   ')
+  return [
+    '\n',
+    pre, target, post, '\n',
+    pre.replace(/./g, ' '), target.replace(/./g, '^'), post.replace(/./g, ' '),
+  ]
+}
+
+// NOTE: stack traces are basically useless here, so not a "real" error
+// This makes tests run dramatically faster
+class TracedParserError {
+  constructor (message, subject) {
+    this.ownMessage = message
+    this.subject = subject
+  }
+  get message () {
+    return `${this.ownMessage}: ${atSubject(this.subject)}`
+  }
+}
+
+class LeftoverTokensError extends TracedParserError {
+  constructor (subject) {
+    super(`Leftover tokens`, subject)
+  }
+}
+
+class UnexpectedEndOfInputError extends TracedParserError {
+  constructor (subject) {
+    super(`Unexpected end of input`, subject)
+  }
+}
+
+class TokenTypeError extends TracedParserError {
+  constructor (type, subject) {
+    super(`Expected ${atIndex(subject)} to have type ${type}`, subject)
+  }
+}
+
+class TokenValueError extends TracedParserError {
+  constructor (value, subject) {
+    super(`Expected ${atIndex(subject)} to have value "${value}"`, subject)
+  }
+}
+
+class NotAStructureError extends TracedParserError {
+  constructor (subject) {
+    super(`Expected a structure`, subject)
+  }
+}
+
+class WrongStructureType extends TracedParserError {
+  constructor (start, end, subject) {
+    super(`Expected a structure wrapped with "${start}" & "${end}"`, subject)
+  }
+}
+
+class AltsError {
+  constructor (errors) {
+    this.message = ['All failed: ', ...errors.map((err) => err && err.message)].join('\n')
+  }
+}
+
+class NotEnoughItemsError extends TracedParserError {
+  constructor (parser, min, subject) {
+    super(`Expected at least ${min} items`, subject)
+  }
+}
 /**
  * mock interface for token
  * @typedef {{type: string, value: any}} Token
@@ -27,16 +97,7 @@ class ParserOutput {
   }
 }
 
-class ParserError {
-  constructor (error, subject) {
-    this.ok = false
-    this.error = error
-    this.subject = subject
-  }
-}
-
 const output = (node, index) => new ParserOutput(node, index)
-const error = (err, subject) => new ParserError(err, subject)
 const update = (subject, output) => new ParseSubject(subject.tokens, output.index)
 const atIndex = (subject) => subject.tokens[subject.index]
 
@@ -83,17 +144,17 @@ export function test_nil_matches_an_empty_sequence (expect) {
   }).toThrow()
 }
 
-class MatchParser {
-  constructor (matchFn, err) {
-    this.matchFn = matchFn
-    this.err = err
+class TokenParser {
+  constructor (type) {
+    this.expected = type
   }
   parse (subject) {
     const token = atIndex(subject)
-    if (!token) { return error('unexpected end of input', subject) }
-    return this.matchFn(token)
-      ? output(atIndex(subject).value, subject.index + 1)
-      : error(this.err, subject)
+    if (!token) { return new UnexpectedEndOfInputError(subject) }
+    if (token.type !== this.expected) {
+      return new TokenTypeError(this.expected, subject)
+    }
+    return output(atIndex(subject).value, subject.index + 1)
   }
 }
 
@@ -101,22 +162,38 @@ class MatchParser {
  * matches if token.type === type.
  * @param {string} type
  */
-export const token = (type) => new MatchParser(
-  tok => tok.type === type,
-  ['did not match type', type])
+export const token = (type) => new TokenParser(type)
 
 export function test_token_matches_a_type (expect) {
   expect(parse(token('foo'), [{ type: 'foo', value: 1 }])).toEqual(1)
   expect(() => { parse(token('foo'), [{ type: 'bar' }]) }).toThrow()
 }
 
+class LiteralParser {
+  constructor (value) {
+    this.tokenValue = value
+  }
+  get expected () {
+    return `"${this.tokenValue}"`
+  }
+  parse (subject) {
+    const token = atIndex(subject)
+    if (!token) { return new UnexpectedEndOfInputError(subject) }
+    if (token.type === 'value') {
+      return new TokenTypeError('line, identifier or operatror', subject)
+    }
+    if (token.value !== this.tokenValue) {
+      return new TokenValueError(this.tokenValue, subject)
+    }
+    return output(atIndex(subject).value, subject.index + 1)
+  }
+}
+
 /**
  * matches if token.value === string, and token is not itself a string.
  * @param {string} string
  */
-export const lit = (value) => new MatchParser(
-  tok => tok.value === value && tok.type !== 'value',
-  ['did not match value', value])
+export const lit = (value) => new LiteralParser(value)
 
 export function test_lit_matches_values (expect) {
   const parser = lit('(')
@@ -176,7 +253,7 @@ class AltParser {
       if (res.ok) { return res }
       errors.push(res.error)
     }
-    return error(['alts failed:', errors], subject)
+    return new AltsError(errors)
   }
 }
 
@@ -209,7 +286,7 @@ class RepeatParser {
       subject = update(subject, res)
     }
     if (out.length < this.min) {
-      return error(['not enough items', this.parser, this.min], subject)
+      return new NotEnoughItemsError(this.parser, this.min, subject)
     }
     return output(quote((...xs) => xs, out), subject.index)
   }
@@ -278,19 +355,19 @@ class WrappedWithParser {
   }
   parse (subject) {
     const token = atIndex(subject)
-    if (!token) { return error('unexpected end of input', subject) }
-    if (token.type !== 'structure') { return error('not a structure', subject) }
+    if (!token) { return new UnexpectedEndOfInputError(subject) }
+    if (token.type !== 'structure') { return new NotAStructureError(subject) }
 
     if (this.start === token.startToken && this.end === token.endToken) {
       const innerSubject = new ParseSubject(token.value, 0)
       const res = this.content.parse(innerSubject)
       if (!res.ok) { return res }
       if (res.index !== token.value.length) {
-        return error('incomplete match', subject)
+        return new LeftoverTokensError(innerSubject)
       }
       return output(res.node, subject.index + 1)
     }
-    return error('no match for structure', subject)
+    return new WrongStructureType(this.start, this.end, subject)
   }
 }
 
@@ -327,12 +404,12 @@ export function parse (parser, tokens) {
   const subject = new ParseSubject(tokens, 0)
   const res = parser.parse(subject)
   if (!res.ok) {
-    throw new Error(res.error)
+    const err = new Error(res.message)
+    err.name = res.constructor.name
+    throw err
   }
   if (res.index !== tokens.length) {
-    throw new LeftoverTokensError(tokens.slice(res.index))
+    throw new LeftoverTokensError(subject)
   }
   return unquote(res.node)
 }
-
-class LeftoverTokensError extends Error {}

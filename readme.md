@@ -2,9 +2,7 @@
 
 ## What is this?
 
-Zebu is a JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) with [tagged template literals](http://2ality.com/2016/11/computing-tag-functions.html).
-
-## Little Languages built with Zebu
+Zebu is a JavaScript library for building [little languages](http://staff.um.edu.mt/afra1/seminar/little-languages.pdf) with [tagged template literals](http://2ality.com/2016/11/computing-tag-functions.html). Here are some examples of little languages built with Zebu:
 
 ### [Ranges](https://github.com/modernserf/zebu/blob/master/src/examples/range.mjs) 
 ```js
@@ -13,7 +11,8 @@ range`1,3 ... (10)` // => yields 1, 3, 5, 7, 9
 
 ### [Data expressions](https://github.com/modernserf/zebu/blob/master/src/examples/data-expressions.mjs)
 ```js
-dx`.foo.bar`.replace({ foo: { bar: 3 } }, 5) // => { foo: { bar: 5 } }
+const obj = { foo: { bar: 3 } }
+dx`.foo.bar`.replace(obj, 5) // => { foo: { bar: 5 } }
 ```
 
 ### [React PropTypes](https://github.com/modernserf/zebu/blob/master/src/examples/prop-types.mjs)
@@ -50,6 +49,22 @@ matrix`
    -1 3 ] * ${x}
 `
 // => [[14, 2], [-13, 8]]
+```
+
+### [Interactive fiction](https://github.com/modernserf/zebu/blob/master/src/examples/interactive-fiction.mjs)
+```js
+const leonAdventure = story`
+  === begin ===
+  "You wake up, unfortunately. There is a treasure chest in the room. You do not know where it came from."
+  * "open treasure chest" -> treasure
+  * "pet cat" -> cat
+  * "go to the bathroom" -> toilet
+  === cat ===
+  "The cat purrs with approval at your touch."
+  * "open treasure chest" -> treasure
+  * "pet cat" -> cat
+  * "go to the bathroom" -> toilet
+`
 ```
 
 ### State machines
@@ -142,15 +157,9 @@ which results in:
 }
 ```
 
-How does this work?
-
-`grammar` and `spaml` are both functions that work with tagged template literals.
-
-TODO: something about tagged template literals
-
 ### Tokenizing
 
-First, the string components and interpolated values are transformed into tokens:
+So how does this work? `grammar` and `spaml` are both functions that work with tagged template literals. First, the string components and interpolated values are transformed into tokens. This text:
 
 ```
   name: "Justin"
@@ -158,7 +167,7 @@ First, the string components and interpolated values are transformed into tokens
   hobbies: ["karaoke", "mixology", "programming"]
 ```
 
-becomes:
+is transformed into:
 
 ```js
 [
@@ -214,11 +223,11 @@ Next, the grouping tokens are matched, and the tokens between them are collected
 ]
 ```
 
-Most parsers don't have this step, but this means that the next step can be much simpler.
+This step allows Zebu to target [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word) -- essentially this means that Zebu grammars can be as (computationally) simple as regular expressions, but still allow recursive structures in brackets. This also makes it easier to provide good error messages & avoid some performance issues. This technique was adapted from [Owl](https://github.com/ianh/owl) and Dylan's [D-Expressions](https://people.csail.mit.edu/jrb/Projects/dexprs.pdf).
 
 ### Parsing
 
-In the next step, we try to match the tokens to the top rule of the grammar. 
+In the next step, we try to match the tokens to the top rule of the grammar.
 
 ```js
 const spaml = grammar`
@@ -234,38 +243,6 @@ const spaml = grammar`
   Sep   = line | ","
 `
 ```
-
-```
-(Block
-  (Pair 
-    (Key (identifier "name")) 
-    (Expr (value "Justin")))
-  (Pair 
-    (Key (identifier "twitter_handle")) 
-    (Expr (value "modernserf")))
-  (Pair 
-    (Key (identifier "hobbies")) 
-    (Expr [
-      (Expr (value "karaoke"))
-      (Expr (value "mixology"))
-      (Expr (value "programming"))
-    ])))
-```
-
-
-
-
-
-
-Zebu is a _parser generator_, much like [yacc](http://dinosaur.compilertools.net/), [PEG.js](https://pegjs.org/), or [Nearley](https://nearley.js.org). 
-
-
-With Zebu, you define grammars with tagged template literals. Like [Owl](https://github.com/ianh/owl), but unlike most other parser generators, Zebu is designed for 
-
-
-
-Zebu targets [visibly pushdown languages](https://en.wikipedia.org/wiki/Nested_word). 
-
 
 These parsing expressions match a single token:
 - `line`, `value`, `operator`, `identifier` - match a token of this type
@@ -288,3 +265,36 @@ These parsing expressions match expressions wrapped in bracketing punctuation. U
 - `#[ expr ]` match `expr` wrapped in square brackets
 - `#{ expr }` match `expr` wrapped in curly braces
 
+### Operator grammars
+
+TODO: operator API
+
+```js
+const math = op`
+  left  "+"   : ${(l, r) => l + r}
+        "-"   : ${(l, r) => l - r}
+  left  "*"   : ${(l, r) => l * r}
+        "/"   : ${(l, r) => l / r}
+        "%"   : ${(l, r) => l % r}
+  right "**"  : ${(l, r) => l ** r}
+  pre   "-"   : ${x => -x}
+  post  "++"  : ${x => x + 1}
+        "--"  : ${x => x - 1}
+`
+expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
+```
+
+TODO: transcluding grammars
+
+```js
+const expr = grammar`
+  Expr = include ${parent => op`
+    left "++" : ${(xs, ys) => xs.concat(ys)}
+    root ${parent.RootExpr}
+  `}
+  RootExpr  = #[ Expr ** "," ]
+            | value
+`
+expect(expr`["foo", "bar"] ++ ["baz"]`)
+  .toEqual(['foo', 'bar', 'baz'])
+```

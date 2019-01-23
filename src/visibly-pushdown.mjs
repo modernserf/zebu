@@ -1,8 +1,26 @@
 import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy } from './parse-utils.mjs'
 import { drop, tag, createCompiler, createTTS } from './compiler-utils'
 
-class UnknownRuleError extends Error {}
-class InvalidBracketLiteralError extends Error {}
+class UnknownRuleError extends Error {
+  constructor (ruleName) {
+    super(`Unknown rule: "${ruleName}"`)
+  }
+}
+class InvalidBracketLiteralError extends Error {
+  constructor (bracket) {
+    super(`"${bracket}" is reserved for brackets, and cannot be used as a keyword or operator`)
+  }
+}
+class RuleError extends Error {
+  constructor (rule, err) {
+    super(`In "${rule}": ${err.message}`)
+  }
+}
+class DuplicateRuleError extends Error {
+  constructor (rule) {
+    super(`Multiple definitions for rule "${rule}"`)
+  }
+}
 
 const id = (x) => x
 const _2 = (_, x) => x
@@ -11,9 +29,12 @@ const last = (...xs) => xs.pop()
 const dlit = (x) => drop(lit(x))
 
 const line = token('line')
-const ignoreLines = drop(alt(line, nil))
-const wrapIgnoreLines = (parser) => seq(_2, alt(line, nil), parser, alt(line, nil))
-const op = (str) => wrapIgnoreLines(dlit(str))
+const optLine = alt(line, nil)
+const wrapIgnoreLines = (parser) => seq(_2, optLine, parser, optLine)
+const sepByWithLines = (expr, sep) => alt(sepBy(
+  expr,
+  seq(id, alt(sep, seq(_2, optLine, sep)), optLine)
+))
 
 const mapFn = seq(_2, dlit(':'), token('value'))
 
@@ -52,10 +73,10 @@ const sepExpr = alt(
 )
 const seqExpr = seq(
   tag('seq'),
-  repeat(sepExpr, 1), alt(seq(_2, ignoreLines, mapFn), nil)
+  repeat(sepExpr, 1), alt(seq(_2, optLine, mapFn), nil)
 )
 
-const expr = seq(tag('alt'), sepBy(seqExpr, op('|')))
+const expr = seq(tag('alt'), sepBy(seqExpr, wrapIgnoreLines(dlit('|'))))
 const rule = seq(tag('rule'), token('identifier'), dlit('='), expr)
 
 const program = alt(
@@ -88,31 +109,24 @@ const compiler = createCompiler({
   },
   nil: () => createTTS(nil),
   rule: (name, rule, ctx) => {
-    ctx.scope[name] = ctx.eval(rule)
+    if (name in ctx.scope) {
+      throw new DuplicateRuleError(name)
+    }
+    try {
+      ctx.scope[name] = ctx.eval(rule)
+    } catch (e) {
+      throw new RuleError(name, e)
+    }
   },
   alt: (xs, ctx) => alt(...xs.map(ctx.eval)),
   seq: (exprs, fn = last, ctx) => seq(fn, ...exprs.map(ctx.eval)),
-  sepByMaybe: (expr, sep, ctx) => {
-    sep = ctx.eval(sep)
-    return alt(
-      seq((xs) => xs,
-        sepBy(
-          ctx.eval(expr),
-          seq(id, alt(sep, seq(_2, ignoreLines, sep)), ignoreLines)
-        ),
-        alt(ignoreLines, nil),
-        alt(sep, nil)
-      ),
+  sepByMaybe: (expr, sep, ctx) =>
+    alt(
+      sepByWithLines(ctx.eval(expr), ctx.eval(sep)),
       seq(() => [], nil)
-    )
-  },
-  sepBy: (expr, sep, ctx) => {
-    sep = ctx.eval(sep)
-    return sepBy(
-      ctx.eval(expr),
-      seq(id, alt(sep, seq(_2, ignoreLines, sep)), ignoreLines)
-    )
-  },
+    ),
+  sepBy: (expr, sep, ctx) =>
+    sepByWithLines(ctx.eval(expr), ctx.eval(sep)),
   repeat0: (expr, ctx) => repeat(ctx.eval(expr), 0),
   repeat1: (expr, ctx) => repeat(ctx.eval(expr), 1),
   maybe: (expr, ctx) => alt(ctx.eval(expr), nil),
@@ -166,12 +180,10 @@ export function test_lang_recursive_rules (expect) {
   expect(math`-(-(123))`).toEqual(123)
 }
 
-export function test_lang_recursive_rule_errors (expect) {
+export function test_lang_bracket_rules (expect) {
   expect(() => {
-    grammar`
-      Value = "("
-    `
-  }).toThrow()
+    grammar`"("`
+  }).toThrow(InvalidBracketLiteralError)
 }
 
 export function test_lang_repeaters (expect) {
@@ -211,4 +223,13 @@ export function test_interpolated_parser (expect) {
   const num = grammar`value`
   const list = grammar`(include ${() => num})+`
   expect(list`1 2 3`).toEqual([1, 2, 3])
+}
+
+export function test_duplicate_rule_error (expect) {
+  expect(() => {
+    grammar`
+      Foo = "foo" value
+      Foo = "bar" value 
+    `
+  }).toThrow(DuplicateRuleError)
 }
