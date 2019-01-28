@@ -82,23 +82,17 @@ function matchAll (pattern, focus) {
     },
   }
 }
-function test (pattern, focus) {
-  return matchAll(pattern, focus).matched
-}
-function match (pattern, focus) {
-  return matchAll(pattern, focus).result
-}
-function replace (pattern, focus, value) {
-  for (const { replace } of pattern(focus)) {
-    return replace(value)
-  }
-  return focus
-}
+
 function decoratePattern (pattern) {
-  pattern.test = (focus) => test(pattern, focus)
-  pattern.match = (focus) => match(pattern, focus)
+  pattern.test = (focus) => matchAll(pattern, focus).matched
+  pattern.match = (focus) => matchAll(pattern, focus).result
   pattern.matchAll = (focus) => matchAll(pattern, focus)
-  pattern.replace = (focus, value) => replace(pattern, focus, value)
+  pattern.replace = (focus, value) => {
+    for (const { replace } of pattern(focus)) {
+      return replace(value)
+    }
+    return focus
+  }
   return pattern
 }
 
