@@ -1,21 +1,22 @@
 {
   "name": "zebu",
   "version": "0.0.2",
-  "description": "",
-  "keywords": [],
+  "description": "little languages with tagged template literals",
+  "keywords": ["parse", "parser", "language", "compiler"],
   "author": "Justin Falcone <justin@justinfalcone.com>",
   "license": "ISC",
+  "engines": {"node": ">=10"},
   "main": "main.build.js",
-  "module": "module.build.js",
+  "module": "module.build.mjs",
   "files": [
     "main.build.js",
-    "module.build.js"
+    "module.build.mjs"
   ],
   "scripts": {
     "lint": "eslint .",
     "test": "node --experimental-modules src/test.mjs | faucet",
     "build:cjs": "rollup src/index.mjs -o main.build.js -f cjs",
-    "build:es": "rollup src/index.mjs -o module.build.js -f es",
+    "build:es": "rollup src/index.mjs -o module.build.mjs -f es",
     "build": "npm run build:cjs && npm run build:es",
     "watch:test": "watch 'npm test' ./src"
   },

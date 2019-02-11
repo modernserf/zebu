@@ -1,6 +1,6 @@
-import { grammar } from './visibly-pushdown'
-import { lit, seq, alt, repeat, wrappedWith, padded, token } from './parse-utils'
-import { createTTS } from './compiler-utils'
+import { grammar } from './visibly-pushdown.mjs'
+import { lit, seq, alt, repeat, wrappedWith, padded, token } from './parse-utils.mjs'
+import { createTTS } from './compiler-utils.mjs'
 
 const list = (...xs) => xs
 

@@ -110,6 +110,15 @@ url.match("https://github.com/modernserf/zebu?foo=bar20baz"/)
 } */
 ```
 
+## Installation & Requirements
+
+```
+npm install zebu
+```
+
+Zebu uses ES2018 features -- it works in node v10 and in modern browsers via `<script type="module">`, but will likely need to be transpiled with Babel for production use.
+
+
 ## Writing a language
 
 Zebu exports the function `grammar` that is used to define the rules for interpreting a language. Let's use `grammar` to make a yaml-like configuration language, called "spaml":
@@ -246,7 +255,7 @@ const spaml = grammar`
 
 These parsing expressions match a single token:
 - `line`, `value`, `operator`, `identifier` - match a token of this type
-- `"include"` `"+"` - match an operator or identifier token with this value
+- `"include"`, `"+"` - match an operator or identifier token with this value
 
 These parsing expressions work similarly to regular expressions, and can refer to the rules defined below them:
 - `expr1 expr2` - matches expr1 followed by `expr2`, returning the result of `expr2`
@@ -265,9 +274,22 @@ These parsing expressions match expressions wrapped in bracketing punctuation. U
 - `#[ expr ]` match `expr` wrapped in square brackets
 - `#{ expr }` match `expr` wrapped in curly braces
 
+### Combining grammars
+
+You can include grammars in each other with `include`:
+
+```js
+const commaSeparatedList = (parent) => grammar`#[ ${parent.Expr} ** "," ]`
+const lang = grammar`
+  Expr  = #(value)
+        | include ${commaSeparatedList}
+        | value
+`
+```
+
 ### Operator grammars
 
-TODO: operator API
+Operator precedence is rather tedious to implement in this grammar, so zebu also includes a separate mini-language just for defining operators. Operators in the same clause have the same precedence level; clauses nearer the top of the list are higher in precedence.
 
 ```js
 const math = op`
@@ -281,10 +303,11 @@ const math = op`
   post  "++"  : ${x => x + 1}
         "--"  : ${x => x - 1}
 `
-expect(math`3 * 4 / 5 * 6`).toEqual((3 * 4) / 5 * 6)
+math`3 * 4 + 5 / 6`
+// parses as (3 * 4) + (5 / 6)
 ```
 
-TODO: transcluding grammars
+You can `include` operator grammars into "regular" grammars:
 
 ```js
 const expr = grammar`
@@ -295,6 +318,16 @@ const expr = grammar`
   RootExpr  = #[ Expr ** "," ]
             | value
 `
-expect(expr`["foo", "bar"] ++ ["baz"]`)
-  .toEqual(['foo', 'bar', 'baz'])
+expr`["foo", "bar"] ++ ["baz"]`
+// => ['foo', 'bar', 'baz']
 ```
+
+## Future work
+
+**Better Documentation.** It took me a long time to understand how parsing works, and I suspect that Zebu's documentation is quite opaque to someone who is new to parsing. How can Zebu be a good introduction to parsing?
+
+**[Babel macro](https://github.com/kentcdodds/babel-plugin-macros) support.** Zebu is designed such that most of the parsing, both in grammars and in the languages they create, can be done at compile time. Zebu doesn't currently take advantage of this, but it would be considerably more useful if it did.
+
+**Interactive parsing workbench.** [Nearley](https://omrelli.ug/nearley-playground/) and [Owl](https://ianh.github.io/owl/try/#example) both have interactive browser examples that were immensely helpful for understanding how they work. Zebu should also support online/interactive examples.
+
+**Better error messages.** Parsing tools are notorious for inscrutable error messages. Can Zebu do better?

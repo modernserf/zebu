@@ -1,4 +1,4 @@
-import { grammar, createCompiler, createTTS } from '../index'
+import { grammar, createCompiler, createTTS } from '../index.mjs'
 
 const list = (...xs) => xs
 const last = (...xs) => xs.pop()

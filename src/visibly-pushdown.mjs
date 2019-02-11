@@ -1,5 +1,5 @@
 import { nil, alt, seq, repeat, token, lit, wrappedWith, sepBy } from './parse-utils.mjs'
-import { drop, tag, createCompiler, createTTS } from './compiler-utils'
+import { drop, tag, createCompiler, createTTS } from './compiler-utils.mjs'
 
 class UnknownRuleError extends Error {
   constructor (ruleName) {

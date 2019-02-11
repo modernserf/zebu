@@ -1,5 +1,5 @@
-import { seq, parse, padded } from './parse-utils'
-import { tokenize } from './token-utils'
+import { seq, parse, padded } from './parse-utils.mjs'
+import { tokenize } from './token-utils.mjs'
 
 const DROP = {}
 const notDropped = (x) => x !== DROP

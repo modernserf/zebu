@@ -1,4 +1,4 @@
-import { grammar } from '../../index'
+import { grammar } from '../index'
 
 const isInt = (x) => x === Math.floor(x)
 
