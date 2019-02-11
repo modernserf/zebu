@@ -1,11 +1,18 @@
 {
   "name": "zebu",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "little languages with tagged template literals",
-  "keywords": ["parse", "parser", "language", "compiler"],
+  "keywords": [
+    "parse",
+    "parser",
+    "language",
+    "compiler"
+  ],
   "author": "Justin Falcone <justin@justinfalcone.com>",
   "license": "ISC",
-  "engines": {"node": ">=10"},
+  "engines": {
+    "node": ">=10"
+  },
   "main": "main.build.js",
   "module": "module.build.mjs",
   "files": [
