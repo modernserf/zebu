@@ -29,7 +29,7 @@ LLL includes a set of parser combinators, and is itself implemented with parser 
 
 */
 
-export function test_match_a_us_phone_number (expect) {
+export function test_match_a_us_phone_number(expect) {
   const phone = text`
     Root      = ~("+"? "1" _)? AreaCode ~(_ "-"? _) Exchange ~(_ "-"? _) Line
                 ${(areaCode, exchange, line) => ({ areaCode, exchange, line })}
@@ -38,26 +38,37 @@ export function test_match_a_us_phone_number (expect) {
     Exchange  = ${/\d{3}/}
     Line      = ${/\d{4}/}
     _         = %whitespace*
-  `
-  expect(phone.match('+1 (800) 555-1234'))
-    .toEqual({ ok: true, value: { areaCode: '800', exchange: '555', line: '1234' } })
+  `;
+  expect(phone.match("+1 (800) 555-1234")).toEqual({
+    ok: true,
+    value: { areaCode: "800", exchange: "555", line: "1234" },
+  });
 
-  expect(phone.get('AreaCode')).match('( 800 )')
-    .toEqual({ ok: true, value: '800' })
+  expect(phone.get("AreaCode"))
+    .match("( 800 )")
+    .toEqual({ ok: true, value: "800" });
 
   // compare to
-  const phoneRE = /^\+1\s*(?:\((\d{3})\)|(\d{3}))\s*-?\s*(\d{3})\s*-?\s*(\d{4})$/
-  expect([...phoneRE.exec('+1 (800) 555-1234')])
-    .toEqual(['+1 (800) 555-1234', '800', null, '555', '1234'])
+  const phoneRE = /^\+1\s*(?:\((\d{3})\)|(\d{3}))\s*-?\s*(\d{3})\s*-?\s*(\d{4})$/;
+  expect([...phoneRE.exec("+1 (800) 555-1234")]).toEqual([
+    "+1 (800) 555-1234",
+    "800",
+    null,
+    "555",
+    "1234",
+  ]);
 }
 
 // Like regular expressions (and unlike `grammar`), `text` can find multiple matches in a string.
-export function test_find_multiple_results (expect) {
-  const pattern = text`... ("fo" | "ba") %letter ...`
-  expect([...pattern.matches('hi foo hello bar baz')])
-    .toEqual([
-      { value: 'foo', start: 3, end: 6 },
-      { value: 'bar', start: 13, end: 16 },
-      { value: 'baz', start: 17, end: 20 },
-    ])
+export function test_find_multiple_results(expect) {
+  const pattern = text`... ("fo" | "ba") %letter ...`;
+  expect([...pattern.matches("hi foo hello bar baz")]).toEqual([
+    { value: "foo", start: 3, end: 6 },
+    { value: "bar", start: 13, end: 16 },
+    { value: "baz", start: 17, end: 20 },
+  ]);
 }
+
+const text = () => {
+  throw new Error("Not yet implemented");
+};

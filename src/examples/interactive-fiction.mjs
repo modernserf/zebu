@@ -1,54 +1,58 @@
-import { grammar } from '../index'
+import { grammar } from "../index.mjs";
 
-const withIndex = (xs) => xs.map((x, index) => ({ ...x, index }))
+const withIndex = (xs) => xs.map((x, index) => ({ ...x, index }));
 
 const story = grammar`
   Story   = Scene ++ line
             : ${(scenes) => new Story(scenes)}
   Scene   = Heading (line Body) (line Choice ++ line)
-            : ${(id, body, choices) => ({ id, body, choices: withIndex(choices) })}
+            : ${(id, body, choices) => ({
+              id,
+              body,
+              choices: withIndex(choices),
+            })}
   Heading = "===" SceneID "===" 
             : ${(_, sceneID) => sceneID}
   Body    = value
   Choice  = ("*" value) (line? "->" SceneID) 
             : ${(label, sceneID) => ({ label, sceneID })}
   SceneID = identifier | value
-`
+`;
 
 class Story {
-  constructor (scenes) {
-    this._createSceneMap(scenes)
-    this._firstSceneID = scenes[0].id
-    this.resetStory()
+  constructor(scenes) {
+    this._createSceneMap(scenes);
+    this._firstSceneID = scenes[0].id;
+    this.resetStory();
   }
-  get scene () {
-    return this._sceneMap[this._sceneID]
+  get scene() {
+    return this._sceneMap[this._sceneID];
   }
-  resetStory () {
-    this._sceneID = this._firstSceneID
-    return this
+  resetStory() {
+    this._sceneID = this._firstSceneID;
+    return this;
   }
-  choose (index) {
-    const choices = this.scene.choices
+  choose(index) {
+    const choices = this.scene.choices;
     if (!(index in choices)) {
-      throw new Error(`Invalid choice ${index}`)
+      throw new Error(`Invalid choice ${index}`);
     }
-    const choice = choices[index]
-    this._sceneID = choice.sceneID
-    return this
+    const choice = choices[index];
+    this._sceneID = choice.sceneID;
+    return this;
   }
-  _createSceneMap (scenes) {
-    this._sceneMap = {}
+  _createSceneMap(scenes) {
+    this._sceneMap = {};
     for (const scene of scenes) {
       if (scene.id in this._sceneMap) {
-        throw new Error(`Duplicate scenes with ID ${scene.id}`)
+        throw new Error(`Duplicate scenes with ID ${scene.id}`);
       }
-      this._sceneMap[scene.id] = scene
+      this._sceneMap[scene.id] = scene;
     }
   }
 }
 
-export function test_interactive_fiction (expect) {
+export function test_interactive_fiction(expect) {
   // from https://twitter.com/leonscoolgame
   const leonAdventure = story`
     === begin ===
@@ -91,23 +95,25 @@ export function test_interactive_fiction (expect) {
     === phone ===
     "The rest of the game would continue from here."
     * "ok" -> begin
-  `
+  `;
 
   expect(leonAdventure.scene).toEqual({
-    id: 'begin',
-    body: 'You wake up, unfortunately. There is a treasure chest in the room. You do not know where it came from.',
+    id: "begin",
+    body:
+      "You wake up, unfortunately. There is a treasure chest in the room. You do not know where it came from.",
     choices: [
-      { index: 0, label: 'open treasure chest', sceneID: 'treasure' },
-      { index: 1, label: 'pet cat', sceneID: 'cat' },
-      { index: 2, label: 'go to the bathroom', sceneID: 'toilet' },
+      { index: 0, label: "open treasure chest", sceneID: "treasure" },
+      { index: 1, label: "pet cat", sceneID: "cat" },
+      { index: 2, label: "go to the bathroom", sceneID: "toilet" },
     ],
-  })
+  });
   expect(leonAdventure.choose(2).scene).toEqual({
-    id: 'toilet',
-    body: 'You walk into the bathroom. It smells like gingerbread cookies and cat litter. You have to pee.',
+    id: "toilet",
+    body:
+      "You walk into the bathroom. It smells like gingerbread cookies and cat litter. You have to pee.",
     choices: [
-      { index: 0, label: 'sit down to pee', sceneID: 'toilet_sit' },
-      { index: 1, label: 'stand up to pee', sceneID: 'toilet_stand' },
+      { index: 0, label: "sit down to pee", sceneID: "toilet_sit" },
+      { index: 1, label: "stand up to pee", sceneID: "toilet_stand" },
     ],
-  })
+  });
 }
