@@ -2,8 +2,8 @@ import moo from "moo";
 
 class BracketMismatchError extends Error {}
 
-const trimQuotes = (str) => str.slice(1, -1).replace(/\\(.)/g, "$1");
-const toNumber = (str) => Number(str.replace(/_/g, ""));
+const trimQuotes = (str: string) => str.slice(1, -1).replace(/\\(.)/g, "$1");
+const toNumber = (str: string) => Number(str.replace(/_/g, "")) as any;
 
 const baseTokenizer = moo.states({
   main: {
@@ -11,7 +11,7 @@ const baseTokenizer = moo.states({
     ignore: [
       { match: /(?: |\t)+/u },
       { match: "//", next: "lineComment" },
-      { match: "/*", next: "blockComment" },
+      { match: /\/\*/u, next: "blockComment" },
     ],
     value: [
       { match: /"(?:\\["\\]|[^\n"\\])*"/u, value: trimQuotes },
@@ -28,6 +28,7 @@ const baseTokenizer = moo.states({
     },
     operator: [{ match: [",", ";"] }, { match: /[!@#%^&*\-+=|/:<>.?~]+/u }],
   },
+  // using separate states for comments allows us to ignore interpolations in comments
   lineComment: {
     ignore: { match: /[^\n]+/u },
     line: { match: /\n+\s*/u, lineBreaks: true, next: "main" },
@@ -35,7 +36,7 @@ const baseTokenizer = moo.states({
   blockComment: {
     ignore: [
       { match: /(?:\*[^/]|[^*])+/u, lineBreaks: true },
-      { match: "*/", next: "main" },
+      { match: /\*\//u, next: "main" },
     ],
   },
 });
@@ -50,7 +51,7 @@ export function tokenize(strs, interpolations) {
 
 // TODO: what does line/col mean when we reset the tokenizer on substri
 function* tokenizeWithInterpolations(strs, interpolations) {
-  let lastState;
+  let lastState: moo.LexerState | undefined;
   for (const str of strs) {
     yield* baseTokenizer.reset(str, lastState);
     lastState = baseTokenizer.save();
@@ -73,7 +74,7 @@ const matches = {
   "]": "[",
   "}": "{",
   ")": "(",
-  end: "start",
+  // end: "start",
 };
 
 function skeletonize(tokens) {
