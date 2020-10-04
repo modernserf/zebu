@@ -133,7 +133,7 @@ type IParserOutput =
       ok: true;
     } & ParserOutput);
 
-interface Parser {
+export interface Parser {
   parse(subject: Subject): IParserOutput;
 }
 

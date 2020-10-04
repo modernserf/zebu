@@ -1,4 +1,4 @@
-import moo from "./moo.mjs";
+import moo from "moo";
 
 class BracketMismatchError extends Error {}
 
@@ -7,34 +7,34 @@ const toNumber = (str) => Number(str.replace(/_/g, ""));
 
 const baseTokenizer = moo.states({
   main: {
-    line: { match: /\n\s*/, lineBreaks: true },
+    line: { match: /\n\s*/u, lineBreaks: true },
     ignore: [
-      { match: /(?: |\t)+/ },
+      { match: /(?: |\t)+/u },
       { match: "//", next: "lineComment" },
       { match: "/*", next: "blockComment" },
     ],
     value: [
-      { match: /"(?:\\["\\]|[^\n"\\])*"/, value: trimQuotes },
-      { match: /'(?:\\['\\]|[^\n'\\])*'/, value: trimQuotes },
-      { match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/, value: toNumber },
-      { match: /0x[0-9A-Fa-f_]+/, value: toNumber },
-      { match: /0o[0-7_]+/, value: toNumber },
-      { match: /0b[0-1_]+/, value: toNumber },
+      { match: /"(?:\\["\\]|[^\n"\\])*"/u, value: trimQuotes },
+      { match: /'(?:\\['\\]|[^\n'\\])*'/u, value: trimQuotes },
+      { match: /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/u, value: toNumber },
+      { match: /0x[0-9A-Fa-f_]+/u, value: toNumber },
+      { match: /0o[0-7_]+/u, value: toNumber },
+      { match: /0b[0-1_]+/u, value: toNumber },
     ],
     startToken: ["[", "(", "{"],
     endToken: ["]", ")", "}"],
     identifier: {
-      match: /(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*/,
+      match: /(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*/u,
     },
-    operator: [{ match: [",", ";"] }, { match: /[!@#%^&*\-+=|/:<>.?~]+/ }],
+    operator: [{ match: [",", ";"] }, { match: /[!@#%^&*\-+=|/:<>.?~]+/u }],
   },
   lineComment: {
-    ignore: { match: /[^\n]+/ },
-    line: { match: /\n+\s*/, lineBreaks: true, next: "main" },
+    ignore: { match: /[^\n]+/u },
+    line: { match: /\n+\s*/u, lineBreaks: true, next: "main" },
   },
   blockComment: {
     ignore: [
-      { match: /(?:\*[^/]|[^*])+/, lineBreaks: true },
+      { match: /(?:\*[^/]|[^*])+/u, lineBreaks: true },
       { match: "*/", next: "main" },
     ],
   },
@@ -98,14 +98,14 @@ function skeletonize(tokens) {
         line: tok.line,
         col: tok.col,
         startToken: tok.value,
-      });
+      } as any);
     } else if (tok.type === "endToken") {
       const structure = stack.pop();
       if (matches[tok.value] !== structure.startToken) {
         throw new BracketMismatchError(tok);
       }
 
-      structure.endToken = tok.value;
+      (structure as any).endToken = tok.value;
       const top = stack[stack.length - 1];
       top.value.push(structure);
     } else {

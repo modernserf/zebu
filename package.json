@@ -28,11 +28,14 @@
     "watch:test": "watch 'npm test' ./src"
   },
   "devDependencies": {
+    "@types/moo": "^0.5.3",
     "eslint": "^7.10.0",
     "mathjs": "^5.4.0",
     "prop-types": "^15.6.2",
     "rollup": "^0.67.3",
     "typescript": "^4.0.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "moo": "^0.5.1"
+  }
 }

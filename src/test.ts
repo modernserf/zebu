@@ -1,8 +1,8 @@
 import assert from "assert";
-// import * as operator from "./operator.mjs";
+import * as operator from "./operator";
 import * as parseUtils from "./parse-utils";
-// import * as tokenUtils from "./token-utils.mjs";
-// import * as visiblyPushdown from "./visibly-pushdown.mjs";
+import * as tokenUtils from "./token-utils";
+import * as visiblyPushdown from "./visibly-pushdown";
 // import * as jsonExample from "./examples/json.mjs";
 // import * as rangeExample from "./examples/range.mjs";
 // import * as propTypesExample from "./examples/prop-types.mjs";
@@ -11,14 +11,12 @@ import * as parseUtils from "./parse-utils";
 // import * as ifExample from "./examples/interactive-fiction.mjs";
 // import * as selfHostingExample from "./examples/itself.mjs";
 // import * as datExExample from "./examples/data-expressions.mjs";
-// import * as nondet from "./nondet.mjs";
 
 const modules = [
   parseUtils,
-  // tokenUtils,
-  // visiblyPushdown,
-  // nondet,
-  // operator,
+  tokenUtils,
+  visiblyPushdown,
+  operator,
   // jsonExample,
   // rangeExample,
   // propTypesExample,
