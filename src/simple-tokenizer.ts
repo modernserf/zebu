@@ -18,6 +18,7 @@ type TokenContent =
     }
   | {
       type: "line";
+      value?: undefined;
     };
 
 /*
