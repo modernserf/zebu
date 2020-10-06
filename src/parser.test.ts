@@ -5,8 +5,10 @@ import {
   TokType,
   Zero,
   Seq,
+  SeqMany,
   Repeat,
   Structure,
+  SepBy,
   Lazy,
   parse,
 } from "./parser";
@@ -21,6 +23,14 @@ const baseToken = {
 function kw(value: string): Token {
   return {
     type: "identifier",
+    value,
+    ...baseToken,
+  };
+}
+
+function op(value: string): Token {
+  return {
+    type: "operator",
     value,
     ...baseToken,
   };
@@ -118,6 +128,43 @@ test("seq", () => {
   }).toThrow();
 });
 
+test("seqMany", () => {
+  expect(
+    parse(
+      [kw("foo"), kw("bar")],
+      new SeqMany(() => true, [new Literal("foo"), new Literal("bar")])
+    )
+  ).toEqual(true);
+  expect(
+    parse(
+      [kw("foo"), kw("bar")],
+      new SeqMany(() => true, [
+        new Zero(() => null),
+        new Literal("foo"),
+        new Literal("bar"),
+      ])
+    )
+  ).toEqual(true);
+  expect(() => {
+    parse(
+      [kw("foo")],
+      new SeqMany(() => true, [new Literal("foo"), new Literal("bar")])
+    );
+  }).toThrow();
+  expect(() => {
+    parse(
+      [kw("foo"), kw("foo")],
+      new SeqMany(() => true, [new Literal("foo"), new Literal("bar")])
+    );
+  }).toThrow();
+  expect(() => {
+    parse(
+      [kw("bar"), kw("bar")],
+      new SeqMany(() => true, [new Literal("foo"), new Literal("bar")])
+    );
+  }).toThrow();
+});
+
 test("alt", () => {
   const nulp = new Zero(() => null);
 
@@ -203,59 +250,51 @@ test("repeat", () => {
   }).toThrow();
 });
 
-test("lazy", () => {
-  expect(parse([kw("foo")], new Lazy(() => new Literal("foo")))).toEqual("foo");
+test("sepBy", () => {
+  expect(
+    parse(
+      [val(1), op(","), val(2)],
+      new SepBy(new TokType("value"), new Literal(","))
+    )
+  ).toEqual([1, 2]);
+
+  expect(
+    parse(
+      [val(1), op(","), val(2), op(",")],
+      new SepBy(new TokType("value"), new Literal(","))
+    )
+  ).toEqual([1, 2]);
+
+  expect(
+    parse([val(1)], new SepBy(new TokType("value"), new Literal(",")))
+  ).toEqual([1]);
+
+  expect(() => {
+    parse(
+      [val(1), op(","), op(",")],
+      new SepBy(new TokType("value"), new Literal(","))
+    );
+  }).toThrow();
+
+  expect(() => {
+    parse([], new SepBy(new TokType("value"), new Literal(",")));
+  }).toThrow();
+
+  expect(() => {
+    parse(
+      [val(1), op(","), val(2)],
+      new SepBy(new Zero(() => null), new Literal(","))
+    );
+  }).toThrow();
+
+  expect(() => {
+    parse(
+      [val(1), op(","), val(2)],
+      new SepBy(new TokType("value"), new Zero(() => null))
+    );
+  }).toThrow();
 });
 
-test.skip("json", () => {
-  const comma = new Literal(",");
-  const litValue = <T>(literal: string, value: T) =>
-    new Seq((_, __) => value, new Literal(literal), new Zero(() => null));
-
-  const sepBy = <T>(valueParser: Parser<T>, separatorParser: Parser<unknown>) =>
-    new Seq(
-      (head, tail) => [head, ...tail],
-      valueParser,
-      new Repeat(new Seq((_: unknown, x: T) => x, separatorParser, valueParser))
-    );
-  const optional = <T>(parser: Parser<T>, getDefault: () => T) =>
-    new Alt([parser, new Zero(getDefault)]);
-  const optSepBy = <T>(
-    valueParser: Parser<T>,
-    separatorParser: Parser<unknown>
-  ) => optional(sepBy(valueParser, separatorParser), () => []);
-
-  function pairsToObject(pairs: Array<[string, JSONValue]>) {
-    const obj = {};
-    for (const [key, value] of pairs) {
-      obj[key] = value;
-    }
-    return obj;
-  }
-
-  type JSONValue =
-    | { [key: string]: JSONValue }
-    | Array<JSONValue>
-    | boolean
-    | number
-    | string
-    | null;
-
-  const jsonParser: Parser<JSONValue> = new Alt([
-    new Seq(
-      (pairs, _) => pairsToObject(pairs),
-      new Structure("{", new Lazy(() => optSepBy(pair, comma))),
-      new Zero(() => null)
-    ),
-    new Structure("[", new Lazy(() => optSepBy(jsonParser, comma))),
-    litValue("true", true),
-    litValue("false", false),
-    litValue("null", null),
-    new TokType("value") as any,
-  ]);
-  const pair = new Seq(
-    (key, value): [string, JSONValue] => [String(key), value],
-    new TokType("value"),
-    new Seq((_, value) => value, new Literal(":"), jsonParser)
-  );
+test("lazy", () => {
+  expect(parse([kw("foo")], new Lazy(() => new Literal("foo")))).toEqual("foo");
 });

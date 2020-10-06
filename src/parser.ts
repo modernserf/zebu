@@ -175,6 +175,7 @@ export class Structure<T> implements Parser<T> {
       return err("no match");
     }
 
+    // TODO: subject should instantiate this, and pass info from parent to child
     const innerSubject = new ParseSubject(tok.value);
     const result = this.parser.parse(innerSubject);
     if (!innerSubject.done()) {
@@ -186,6 +187,9 @@ export class Structure<T> implements Parser<T> {
 }
 
 // matches multiple tokens
+
+// TODO: fn arg (here and in SeqMany) accepts `trace((info, l, r) => ...)`
+// where `info` contains info from parse subject
 export class Seq<L, R, Out> implements Parser<Out> {
   firstTokenOptions: FirstTokenOptions;
   constructor(
@@ -212,6 +216,42 @@ export class Seq<L, R, Out> implements Parser<Out> {
       return err(rightResult.message);
     }
     return ok(this.fn(leftResult.value, rightResult.value));
+  }
+}
+
+// TODO: can we type this correctly?
+export class SeqMany<T> implements Parser<T> {
+  firstTokenOptions: FirstTokenOptions;
+  constructor(
+    private readonly fn: (...xs: unknown[]) => T,
+    private readonly parsers: Parser<unknown>[]
+  ) {
+    this.firstTokenOptions = new Set([]);
+
+    for (const p of parsers) {
+      if (p.firstTokenOptions.has(null)) {
+        const withoutNull = new Set([...p.firstTokenOptions]);
+        withoutNull.delete(null);
+        this.firstTokenOptions = union(this.firstTokenOptions, withoutNull);
+      } else {
+        this.firstTokenOptions = union(
+          this.firstTokenOptions,
+          p.firstTokenOptions
+        );
+        break;
+      }
+    }
+  }
+  parse(subject: ParseSubject): ParseOutput<T> {
+    const err = subject.save();
+    const results = [];
+    for (const p of this.parsers) {
+      const result = p.parse(subject);
+      if (result.type === "error") {
+        return err(result.message);
+      }
+    }
+    return ok(this.fn(...results));
   }
 }
 
@@ -251,6 +291,38 @@ export class Repeat<T> implements Parser<T[]> {
     const results: T[] = [];
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      const result = this.parser.parse(subject);
+      if (result.type === "error") {
+        break;
+      }
+      results.push(result.value);
+    }
+    return ok(results);
+  }
+}
+
+export class SepBy<T> implements Parser<T[]> {
+  firstTokenOptions: FirstTokenOptions;
+  constructor(
+    private readonly parser: Parser<T>,
+    private readonly separator: Parser<unknown>
+  ) {
+    if (parser.firstTokenOptions.has(null)) {
+      throw new Error("SepBy parser cannot match null");
+    }
+    if (separator.firstTokenOptions.has(null)) {
+      throw new Error("separator cannot match null");
+    }
+    this.firstTokenOptions = parser.firstTokenOptions;
+  }
+  parse(subject: ParseSubject): ParseOutput<T[]> {
+    const firstResult = this.parser.parse(subject);
+    if (firstResult.type === "error") return firstResult;
+    const results = [firstResult.value];
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      if (this.separator.parse(subject).type === "error") break;
+
       const result = this.parser.parse(subject);
       if (result.type === "error") {
         break;
