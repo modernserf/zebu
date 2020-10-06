@@ -15,10 +15,6 @@ type TokenContent =
   | {
       type: "identifier";
       value: string;
-    }
-  | {
-      type: "line";
-      value?: undefined;
     };
 
 /*
@@ -150,7 +146,7 @@ class LexerState {
     }
   }
   getInterpolation() {
-    let token: Token & { type: "value" };
+    let token: (Token & { type: "value" }) | undefined;
     if (this.outerIndex < this.interps.length) {
       token = {
         type: "value",
@@ -185,23 +181,13 @@ class LexerState {
 
 // each regex state is a set of capture groups
 // 1: whitespace 2: "//" 3: "/*" 4, 5, 6, 7: number 8: identifier 9: operator
-const mainPattern = /((?: |\t)+)|(\/\/)|(\/\*)|(0x[0-9A-Fa-f_]+)|(0o[0-7_]+)|(0b[0-1_]+)|(-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?)|((?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*)|([!@#%^&*\-+=|/:<>.?~]+)/uy;
+const mainPattern = /([ \t\n]+)|(\/\/)|(\/\*)|(0x[0-9A-Fa-f_]+)|(0o[0-7_]+)|(0b[0-1_]+)|(-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?)|((?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*)|([!@#%^&*\-+=|/:<>.?~]+)/uy;
 function mainState(lexerState: LexerState) {
   let ch: string | undefined;
   while (lexerState.hasStrings()) {
     // TODO: is this actually better than using regex?
     while ((ch = lexerState.nextChar())) {
       switch (ch) {
-        case `\n`:
-          lexerState.push({
-            type: "line",
-            index: lexerState.index,
-            outerIndex: lexerState.outerIndex,
-            length: 0,
-          });
-          lexerState.index++;
-          line(lexerState);
-          break;
         case `'`:
           lexerState.index++;
           quote(singleQuotePattern, lexerState);
@@ -250,12 +236,6 @@ function mainState(lexerState: LexerState) {
             case match[1]:
               break;
             case match[2]:
-              lexerState.push({
-                type: "line",
-                index: lastIndex,
-                outerIndex: lexerState.outerIndex,
-                length: matchedString.length,
-              });
               lineComment(lexerState);
               break;
             case match[3]:
@@ -301,25 +281,6 @@ function mainState(lexerState: LexerState) {
   }
 }
 
-const linePattern = /([ \t\n]+)|(\/\/)|(\/\*)/y;
-// yield one line for multiple lines, including comments
-function line(lexerState: LexerState) {
-  while (lexerState.nextChar()) {
-    const match = lexerState.matchPattern(linePattern);
-    if (!match) return;
-
-    switch (match[0]) {
-      case match[1]:
-        break; // whitespace
-      case match[2]:
-        lineComment(lexerState);
-        break;
-      case match[3]:
-        blockComment(lexerState);
-    }
-  }
-  lexerState.push(lexerState.getInterpolation());
-}
 const singleQuotePattern = /((?:\\['\\]|[^\n'\\])+)|(')/y;
 const doubleQuotePattern = /((?:\\["\\]|[^\n"\\])+)|(")/y;
 
@@ -370,8 +331,6 @@ function lineComment(lexerState: LexerState) {
         case match[1]:
           break;
         case match[2]:
-          // TODO: is mutual recursion likely to be a problem here?
-          line(lexerState);
           return;
       }
     }

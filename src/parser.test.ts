@@ -26,14 +26,6 @@ function kw(value: string): Token {
   };
 }
 
-function op(value: string): Token {
-  return {
-    type: "operator",
-    value,
-    ...baseToken,
-  };
-}
-
 function val(value: unknown): Token {
   return {
     type: "value",

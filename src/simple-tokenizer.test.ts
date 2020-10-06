@@ -59,26 +59,19 @@ test("interpolation", () => {
     { type: "value", value: 1 },
     { type: "value", value: 2 },
     { type: "value", value: "4" },
-    { type: "line" },
   ]);
-});
 
-test("line coalescing", () => {
   expect(
     tok`
-    foo // comment
-
-    /* block comment */
-
-    // another comment
-
-    bar
-  `.map(strip)
+      1 
+      ${2} /* 
+      ${3} */ 
+      "${4}" 
+      // ${5}
+    `.map(strip)
   ).toEqual([
-    { type: "line" },
-    { type: "identifier", value: "foo" },
-    { type: "line" },
-    { type: "identifier", value: "bar" },
-    { type: "line" },
+    { type: "value", value: 1 },
+    { type: "value", value: 2 },
+    { type: "value", value: "4" },
   ]);
 });
