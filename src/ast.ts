@@ -1,3 +1,4 @@
+import { identifierOrOperator } from "./lexer";
 import {
   Parser,
   Alt,
@@ -91,10 +92,18 @@ const baseExpr = new Alt<ASTExpr>([
   ),
   new Seq((value) => ({ type: "identifier", value }), ident, nil),
   new Seq(
-    (value) =>
-      typeof value == "string"
-        ? { type: "literal", value }
-        : { type: "error", message: "literals must be strings" },
+    (value) => {
+      if (typeof value !== "string") {
+        return { type: "error", message: "literals must be strings" };
+      }
+      if (!identifierOrOperator.test(value)) {
+        return {
+          type: "error",
+          message: "not a valid literal",
+        };
+      }
+      return { type: "literal", value };
+    },
     value,
     nil
   ),

@@ -2,7 +2,7 @@ import { StructureStartToken, Token } from "./lexer";
 
 type Brand<K, T> = K & { __brand: T };
 
-class ParseSubject {
+export class ParseSubject {
   private index = 0;
   constructor(private readonly tokens: Token[]) {}
   next(): Token | null {
@@ -11,7 +11,7 @@ class ParseSubject {
   peek(): Token | null {
     return this.tokens[this.index] || null;
   }
-  done() {
+  done(): boolean {
     return this.index === this.tokens.length;
   }
   save() {

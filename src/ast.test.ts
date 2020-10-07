@@ -158,6 +158,9 @@ test("ast errors and defaults", () => {
   const badLiteral = ast`1`;
   expect(badLiteral).toMatchObject({ type: "error" });
 
+  const badLiteral2 = ast`"{"`;
+  expect(badLiteral2).toMatchObject({ type: "error" });
+
   const badInclude = ast`include ${null}`;
   expect(badInclude).toMatchObject({ type: "error" });
 });
