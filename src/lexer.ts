@@ -1,3 +1,4 @@
+export type StructureStartToken = "{" | "[" | "(";
 type TokenContent =
   | {
       type: "value";
@@ -6,7 +7,7 @@ type TokenContent =
   | {
       type: "structure";
       value: Token[];
-      startToken: "{" | "[" | "(";
+      startToken: StructureStartToken;
     }
   | {
       type: "operator";
@@ -68,7 +69,10 @@ const endTokenMatches = {
 class LexerState {
   index = 0;
   outerIndex = 0;
-  private stack: Token[][] = [];
+  private stack: Array<{
+    lastTokens: Token[];
+    structure: Token & { type: "structure" };
+  }> = [];
   private tokens: Token[] = [];
   constructor(
     public readonly strings: readonly string[],
@@ -79,9 +83,9 @@ class LexerState {
   }
   getTokens() {
     if (this.stack.length) {
-      const lastStructure = this.tokens[this.tokens.length - 1];
+      const { structure } = this.stack[this.stack.length - 1];
       throw new MismatchedBracketError(
-        startTokenMatches[(lastStructure as any).startToken],
+        startTokenMatches[structure.startToken],
         "end",
         this.index,
         this.outerIndex
@@ -93,7 +97,7 @@ class LexerState {
     if (!token) return;
     this.tokens.push(token);
   }
-  start(startToken: "{" | "[" | "(") {
+  start(startToken: StructureStartToken) {
     const nextTokens = [];
     const structure: Token = {
       type: "structure",
@@ -103,14 +107,13 @@ class LexerState {
       outerIndex: this.outerIndex,
       length: 0, // filled in in `end`
     };
-    this.tokens.push(structure);
-    this.stack.push(this.tokens);
+    this.stack.push({ structure, lastTokens: this.tokens });
     this.tokens = nextTokens;
   }
   end(endToken: "}" | "]" | ")") {
     const expectedStartToken = endTokenMatches[endToken];
-    const lastTokens = this.stack.pop();
-    if (!lastTokens) {
+    const stackFrame = this.stack.pop();
+    if (!stackFrame) {
       throw new MismatchedBracketError(
         expectedStartToken,
         "end",
@@ -118,13 +121,14 @@ class LexerState {
         this.outerIndex
       );
     }
-    this.tokens = lastTokens;
 
-    const lastStructure: any = this.tokens[this.tokens.length - 1];
+    this.tokens = stackFrame.lastTokens;
+    const lastStructure = stackFrame.structure;
+
     if (lastStructure.startToken !== expectedStartToken) {
       throw new MismatchedBracketError(
         expectedStartToken,
-        lastStructure.strtToken,
+        lastStructure.startToken,
         this.index,
         this.outerIndex
       );
@@ -144,6 +148,7 @@ class LexerState {
         // last string to this point
         this.index;
     }
+    this.tokens.push(lastStructure);
   }
   getInterpolation() {
     let token: (Token & { type: "value" }) | undefined;
@@ -232,46 +237,35 @@ function mainState(lexerState: LexerState) {
           }
           const matchedString = match[0];
 
-          switch (matchedString) {
-            case match[1]:
-              break;
-            case match[2]:
-              lineComment(lexerState);
-              break;
-            case match[3]:
-              blockComment(lexerState);
-              break;
-            case match[4]:
-            case match[5]:
-            case match[6]:
-            case match[7]: {
-              const value = Number(matchedString);
-              lexerState.push({
-                type: "value",
-                value,
-                index: lastIndex,
-                outerIndex: lexerState.outerIndex,
-                length: matchedString.length,
-              });
-              break;
-            }
-            case match[8]:
-              lexerState.push({
-                type: "identifier",
-                value: matchedString,
-                index: lastIndex,
-                outerIndex: lexerState.outerIndex,
-                length: matchedString.length,
-              });
-              break;
-            case match[9]:
-              lexerState.push({
-                type: "operator",
-                value: matchedString,
-                index: lastIndex,
-                outerIndex: lexerState.outerIndex,
-                length: matchedString.length,
-              });
+          if (match[2]) {
+            lineComment(lexerState);
+          } else if (match[3]) {
+            blockComment(lexerState);
+          } else if (match[4] || match[5] || match[6] || match[7]) {
+            const value = Number(matchedString);
+            lexerState.push({
+              type: "value",
+              value,
+              index: lastIndex,
+              outerIndex: lexerState.outerIndex,
+              length: matchedString.length,
+            });
+          } else if (match[8]) {
+            lexerState.push({
+              type: "identifier",
+              value: matchedString,
+              index: lastIndex,
+              outerIndex: lexerState.outerIndex,
+              length: matchedString.length,
+            });
+          } else if (match[9]) {
+            lexerState.push({
+              type: "operator",
+              value: matchedString,
+              index: lastIndex,
+              outerIndex: lexerState.outerIndex,
+              length: matchedString.length,
+            });
           }
         }
       }
@@ -297,17 +291,16 @@ function quote(pattern: RegExp, lexerState: LexerState) {
       const match = lexerState.matchPattern(pattern);
       // TODO: what could this be besides a newline? Why _shouldn't_ a newline be allowed?
       if (!match) throw new Error("newline not allowed in string");
-      switch (match[0]) {
+
+      if (match[1]) {
         // quote body
-        case match[1]:
-          token.value += match[1];
-          token.length += match[1].length;
-          break;
+        token.value += match[1];
+        token.length += match[1].length;
+      } else {
         // end quote
-        case match[2]:
-          token.length++; // add 1 for end quote
-          lexerState.push(token);
-          return;
+        token.length++; // add 1 for end quote
+        lexerState.push(token);
+        return;
       }
     }
     // if interpolating mid-string, interpolate the value _into_ the strin
@@ -326,13 +319,7 @@ function lineComment(lexerState: LexerState) {
     while (lexerState.nextChar()) {
       const match = lexerState.matchPattern(lineCommentPattern);
       // istanbul ignore next
-      if (!match) return;
-      switch (match[0]) {
-        case match[1]:
-          break;
-        case match[2]:
-          return;
-      }
+      if (!match || match[2]) return;
     }
     lexerState.getInterpolation();
   }
@@ -344,13 +331,7 @@ function blockComment(lexerState: LexerState) {
     while (lexerState.nextChar()) {
       const match = lexerState.matchPattern(blockCommentPattern);
       // istanbul ignore next
-      if (!match) return;
-      switch (match[0]) {
-        case match[1]:
-          break;
-        case match[2]:
-          return;
-      }
+      if (!match || match[2]) return;
     }
     lexerState.getInterpolation();
   }

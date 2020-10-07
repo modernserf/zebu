@@ -12,7 +12,7 @@ import {
   Lazy,
   parse,
 } from "./parser";
-import { Token } from "./simple-tokenizer";
+import { StructureStartToken, Token } from "./lexer";
 
 const baseToken = {
   index: 0,
@@ -44,7 +44,7 @@ function val(value: unknown): Token {
   };
 }
 
-function struct(startToken: "{" | "[" | "(", value: Token[]): Token {
+function struct(startToken: StructureStartToken, value: Token[]): Token {
   return {
     type: "structure",
     startToken,
@@ -132,9 +132,9 @@ test("seqMany", () => {
   expect(
     parse(
       [kw("foo"), kw("bar")],
-      new SeqMany(() => true, [new Literal("foo"), new Literal("bar")])
+      new SeqMany((x, y) => y, [new Literal("foo"), new Literal("bar")])
     )
-  ).toEqual(true);
+  ).toEqual("bar");
   expect(
     parse(
       [kw("foo"), kw("bar")],

@@ -1,4 +1,4 @@
-import { Token, tokenize } from "./simple-tokenizer";
+import { Token, tokenize } from "./lexer";
 function tok(strs: TemplateStringsArray, ...interps: unknown[]) {
   return tokenize(strs.raw, interps);
 }

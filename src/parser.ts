@@ -1,4 +1,4 @@
-import { Token } from "./simple-tokenizer";
+import { StructureStartToken, Token } from "./lexer";
 
 type Brand<K, T> = K & { __brand: T };
 
@@ -16,7 +16,7 @@ class ParseSubject {
   }
   save() {
     const oldIndex = this.index;
-    return (message: string): ParseOutput<any> => {
+    return <T>(message: string): ParseOutput<T> => {
       this.index = oldIndex;
       // TODO: error should contain token info
       return { type: "error", message };
@@ -47,13 +47,11 @@ export interface Parser<T> {
   firstTokenOptions: FirstTokenOptions;
 }
 
-type StartToken = "{" | "[" | "(";
-
 type FirstTokenOption = Brand<string, "FirstTokenOption">;
 type FirstTokenOptions = Set<FirstTokenOption | null>;
 const brandLiteral = (value: string) => `literal-${value}` as FirstTokenOption;
 const brandType = (type: string) => `type-${type}` as FirstTokenOption;
-const brandStructure = (startToken: StartToken) =>
+const brandStructure = (startToken: StructureStartToken) =>
   `startToken-${startToken}` as FirstTokenOption;
 
 type LiteralToken = Token & { value: string };
@@ -162,7 +160,7 @@ export class TokType<Type extends TokenType>
 export class Structure<T> implements Parser<T> {
   firstTokenOptions: FirstTokenOptions;
   constructor(
-    private readonly startToken: StartToken,
+    private readonly startToken: StructureStartToken,
     private readonly parser: Parser<T>
   ) {
     this.firstTokenOptions = new Set([brandStructure(this.startToken)]);
@@ -244,12 +242,13 @@ export class SeqMany<T> implements Parser<T> {
   }
   parse(subject: ParseSubject): ParseOutput<T> {
     const err = subject.save();
-    const results = [];
+    const results: unknown[] = [];
     for (const p of this.parsers) {
       const result = p.parse(subject);
       if (result.type === "error") {
         return err(result.message);
       }
+      results.push(result.value);
     }
     return ok(this.fn(...results));
   }

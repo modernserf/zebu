@@ -13,18 +13,16 @@ import {
 
 type StartToken = "{" | "(" | "[";
 
+const id = <T>(x: T) => x;
 const nil = new Zero(() => null);
-
 const struct = <T>(startToken: StartToken, getParser: () => Parser<T>) =>
   new Structure(startToken, new Lazy(getParser));
 const optNil = <T>(parser: Parser<T>) => new Alt([parser, nil]);
-const repeat1 = <T>(parser: Parser<T>) =>
-  new Seq((h, t) => [h, ...t], parser, new Repeat(parser));
 
 //   Grammar = Rule ++ ";"
 //           | AltExpr;
 //   Rule    = identifier "=" AltExpr;
-//   AltExpr = SeqExpr ++ "|";
+//   AltExpr = SeqExpr ** "|";
 //   SeqExpr = SepExpr+ (":" value)?;
 //   SepExpr = RepExpr "++" RepExpr
 //           | RepExpr "**" RepExpr
@@ -45,17 +43,21 @@ const value = new TokType("value");
 const ident = new TokType("identifier");
 const hash = new Literal("#");
 
+type IncludeFn = (x: Map<string, Parser<unknown>>) => Parser<unknown>;
+type SeqFn = (...xs: unknown[]) => unknown;
 type ASTExpr =
-  | { type: "value"; value: unknown }
+  | { type: "error"; message: string }
+  | { type: "nil" }
+  | { type: "literal"; value: string }
   | { type: "identifier"; value: string }
-  | { type: "include"; value: unknown }
+  | { type: "include"; value: IncludeFn }
   | { type: "structure"; startToken: StartToken; expr: ASTExpr }
   | { type: "maybe"; expr: ASTExpr }
   | { type: "repeat0"; expr: ASTExpr }
   | { type: "repeat1"; expr: ASTExpr }
   | { type: "sepBy0"; expr: ASTExpr; separator: ASTExpr }
   | { type: "sepBy1"; expr: ASTExpr; separator: ASTExpr }
-  | { type: "seq"; exprs: ASTExpr[]; fn: unknown }
+  | { type: "seq"; exprs: ASTExpr[]; fn: SeqFn }
   | { type: "alt"; exprs: ASTExpr[] };
 
 export type AST =
@@ -80,12 +82,22 @@ const baseExpr = new Alt<ASTExpr>([
     struct("{", () => altExpr)
   ),
   new Seq(
-    (_, value) => ({ type: "include", value }),
+    (_, value) =>
+      typeof value === "function"
+        ? { type: "include", value: value as IncludeFn }
+        : { type: "error", message: "include must be function" },
     new Literal("include"),
     value
   ),
   new Seq((value) => ({ type: "identifier", value }), ident, nil),
-  new Seq((value) => ({ type: "value", value }), value, nil),
+  new Seq(
+    (value) =>
+      typeof value == "string"
+        ? { type: "literal", value }
+        : { type: "error", message: "literals must be strings" },
+    value,
+    nil
+  ),
 ]);
 
 const repExpr = new Alt<ASTExpr>([
@@ -110,15 +122,29 @@ const sepExpr = new Alt<ASTExpr>([
 ]);
 
 const seqExpr: Parser<ASTExpr> = new Seq(
-  (exprs, fn) =>
-    fn === null && exprs.length === 1 ? exprs[0] : { type: "seq", exprs, fn },
-  repeat1(sepExpr),
+  (exprs, fn): ASTExpr => {
+    if (fn === null && exprs.length === 1) {
+      return exprs[0];
+    }
+    if (fn === null) fn = id;
+
+    if (typeof fn !== "function") {
+      return { type: "error", message: "seq needs a function" };
+    }
+    return { type: "seq", exprs, fn: fn as SeqFn };
+  },
+  new Seq((h, t) => [h, ...t], sepExpr, new Repeat(sepExpr)),
   optNil(new Seq((_, x) => x, new Literal(":"), value))
 );
 
 const altExpr: Parser<ASTExpr> = new Seq(
-  (exprs) => (exprs.length === 1 ? exprs[0] : { type: "alt", exprs }),
-  new SepBy(seqExpr, new Literal("|")),
+  (exprs) =>
+    !exprs
+      ? { type: "nil" }
+      : exprs.length === 1
+      ? exprs[0]
+      : { type: "alt", exprs },
+  optNil(new SepBy(seqExpr, new Literal("|"))),
   nil
 );
 
