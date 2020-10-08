@@ -184,7 +184,7 @@ class LexerState {
   }
 }
 
-export const identifierOrOperator = /(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*|[!@#%^&*\-+=|/:<>.?~]+|[,;]/u;
+export const identifierOrOperator = /^(?:(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*|[!@#%^&*\-+=|/:<>.?~]+|[,;])$/u;
 // each regex state is a set of capture groups
 // 1: whitespace 2: "//" 3: "/*" 4, 5, 6, 7: number 8: identifier 9: operator
 const mainPattern = /([ \t\n]+)|(\/\/)|(\/\*)|(0x[0-9A-Fa-f_]+)|(0o[0-7_]+)|(0b[0-1_]+)|(-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?)|((?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*)|([!@#%^&*\-+=|/:<>.?~]+)/uy;

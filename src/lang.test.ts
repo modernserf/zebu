@@ -53,12 +53,3 @@ test("interpolated parser", () => {
   const list = lang`(include ${() => num})+`;
   expect(list`1 2 3`).toEqual([1, 2, 3]);
 });
-
-// export function test_duplicate_rule_error(expect) {
-//   expect(() => {
-//     grammar`
-//       Foo = "foo" value
-//       Foo = "bar" value
-//     `;
-//   }).toThrow(DuplicateRuleError);
-// }

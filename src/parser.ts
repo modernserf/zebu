@@ -14,7 +14,7 @@ export class ParseSubject {
   done(): boolean {
     return this.index === this.tokens.length;
   }
-  save() {
+  save(): <T>(message: string) => ParseOutput<T> {
     const oldIndex = this.index;
     return <T>(message: string): ParseOutput<T> => {
       this.index = oldIndex;
@@ -224,20 +224,14 @@ export class SeqMany<T> implements Parser<T> {
     private readonly fn: (...xs: unknown[]) => T,
     private readonly parsers: Parser<unknown>[]
   ) {
-    this.firstTokenOptions = new Set([]);
+    this.firstTokenOptions = new Set([null]);
 
     for (const p of parsers) {
-      if (p.firstTokenOptions.has(null)) {
-        const withoutNull = new Set([...p.firstTokenOptions]);
-        withoutNull.delete(null);
-        this.firstTokenOptions = union(this.firstTokenOptions, withoutNull);
-      } else {
-        this.firstTokenOptions = union(
-          this.firstTokenOptions,
-          p.firstTokenOptions
-        );
-        break;
-      }
+      if (!this.firstTokenOptions.has(null)) break;
+
+      const withoutNull = new Set([...this.firstTokenOptions]);
+      withoutNull.delete(null);
+      this.firstTokenOptions = union(withoutNull, p.firstTokenOptions);
     }
   }
   parse(subject: ParseSubject): ParseOutput<T> {

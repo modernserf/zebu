@@ -1,15 +1,14 @@
 import { grammar } from "./ast";
 import { compile } from "./compiler";
 import { tokenize } from "./lexer";
-import { parse, Parser, ParseSubject } from "./parser";
+import { parse, Parser, ParseSubject, Seq, Zero } from "./parser";
 
-export function lang(
-  strs: TemplateStringsArray,
-  ...xs: unknown[]
-): Parser<unknown> &
-  ((strs: TemplateStringsArray, ...xs: unknown[]) => unknown) {
-  const parserCore = compile(parse(tokenize(strs.raw, xs), grammar));
+export type ZebuLanguageReturning<Type> = Parser<unknown> &
+  ((strs: TemplateStringsArray, ...xs: unknown[]) => Type);
 
+export type ZebuLanguage = ZebuLanguageReturning<unknown>;
+
+export function createLanguage(parserCore: Parser<unknown>): ZebuLanguage {
   function parser(strs: TemplateStringsArray, ...xs: unknown[]) {
     return parse(tokenize(strs.raw, xs), parserCore);
   }
@@ -18,3 +17,7 @@ export function lang(
 
   return parser;
 }
+
+export const lang = createLanguage(
+  new Seq((ast) => createLanguage(compile(ast)), grammar, new Zero(() => null))
+) as ZebuLanguageReturning<ZebuLanguage>;

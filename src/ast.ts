@@ -46,7 +46,7 @@ const hash = new Literal("#");
 
 type IncludeFn = (x: Map<string, Parser<unknown>>) => Parser<unknown>;
 type SeqFn = (...xs: unknown[]) => unknown;
-type ASTExpr =
+export type ASTExpr =
   | { type: "error"; message: string }
   | { type: "nil" }
   | { type: "literal"; value: string }
