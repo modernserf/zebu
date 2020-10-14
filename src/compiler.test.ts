@@ -49,6 +49,7 @@ test("simple parsers", () => {
   const parens = compile({
     type: "structure",
     startToken: "(",
+    endToken: ")",
     expr: { type: "literal", value: "foo" },
   });
   expect(parse([op("("), kw("foo"), op(")")], parens)).toEqual("foo");

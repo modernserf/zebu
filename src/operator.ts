@@ -154,6 +154,7 @@ export function buildAST(rules: Rule[], rootExpr: Parser<unknown> | null): AST {
             {
               type: "structure",
               startToken: "(",
+              endToken: ")",
               expr: { type: "identifier", value: "TopExpr" },
             },
             rootASTNode,

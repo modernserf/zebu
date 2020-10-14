@@ -101,8 +101,7 @@ const mainPattern = new RegExp(
     /0b[0-1_]+/,
     /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/,
     /(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*/, // identifier
-    /[;{}()[\],]/, // one-char operator
-    /[!@#%^&*\-+=|/:<>.?~]+/, // multi-char operator
+    /[;{}()[\],]|(?:[!@#%^&*\-+=|/:<>.?~]+)/, // operators
   ]
     .map((re) => `(${re.source})`)
     .join("|"),
@@ -157,7 +156,7 @@ function mainState(lexerState: LexerState) {
               outerIndex: lexerState.outerIndex,
               length: matchedString.length,
             });
-          } else if (match[9] || match[10]) {
+          } else if (match[9]) {
             lexerState.push({
               type: "operator",
               value: matchedString,

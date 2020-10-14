@@ -19,12 +19,6 @@ function assertUnreachable(_: never): never {
   throw new Error();
 }
 
-const startTokenMatches = {
-  "[": "]",
-  "{": "}",
-  "(": ")",
-};
-
 class Compiler {
   private scope: Map<string, Parser<unknown>>;
   private ruleNames: Set<string> = new Set();
@@ -62,7 +56,7 @@ class Compiler {
         return new SeqMany((_, x, __) => x, [
           new Literal(node.startToken),
           new Lazy(() => this.compile(node.expr)),
-          new Literal(startTokenMatches[node.startToken]),
+          new Literal(node.endToken),
         ]);
       case "maybe":
         return new Alt([this.compile(node.expr), nil]);

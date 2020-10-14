@@ -12,21 +12,17 @@ import {
   SeqMany,
 } from "./parser";
 
-type StartToken = "{" | "(" | "[";
-
-const startTokenMatches = {
-  "[": "]",
-  "{": "}",
-  "(": ")",
-};
-
 const id = <T>(x: T) => x;
 const nil = new Zero(() => null);
-const struct = <T>(startToken: StartToken, getParser: () => Parser<T>) =>
+const struct = <T>(
+  startToken: string,
+  endToken: string,
+  getParser: () => Parser<T>
+) =>
   new SeqMany<T>((_, x, __) => x as T, [
     new Literal(startToken),
     new Lazy(getParser),
-    new Literal(startTokenMatches[startToken]),
+    new Literal(endToken),
   ]);
 const optNil = <T>(parser: Parser<T>) => new Alt([parser, nil]);
 
@@ -62,7 +58,7 @@ export type ASTExpr =
   | { type: "literal"; value: string }
   | { type: "identifier"; value: string }
   | { type: "include"; value: IncludeFn }
-  | { type: "structure"; startToken: StartToken; expr: ASTExpr }
+  | { type: "structure"; startToken: string; endToken: string; expr: ASTExpr }
   | { type: "maybe"; expr: ASTExpr }
   | { type: "repeat0"; expr: ASTExpr }
   | { type: "repeat1"; expr: ASTExpr }
@@ -76,21 +72,21 @@ export type AST =
   | ASTExpr;
 
 const baseExpr = new Alt<ASTExpr>([
-  struct("(", () => altExpr),
+  struct("(", ")", () => altExpr),
   new Seq(
-    (_, expr) => ({ type: "structure", startToken: "(", expr }),
+    (_, expr) => ({ type: "structure", startToken: "(", endToken: ")", expr }),
     hash,
-    struct("(", () => altExpr)
+    struct("(", ")", () => altExpr)
   ),
   new Seq(
-    (_, expr) => ({ type: "structure", startToken: "[", expr }),
+    (_, expr) => ({ type: "structure", startToken: "[", endToken: "]", expr }),
     hash,
-    struct("[", () => altExpr)
+    struct("[", "]", () => altExpr)
   ),
   new Seq(
-    (_, expr) => ({ type: "structure", startToken: "{", expr }),
+    (_, expr) => ({ type: "structure", startToken: "{", endToken: "}", expr }),
     hash,
-    struct("{", () => altExpr)
+    struct("{", "}", () => altExpr)
   ),
   new Seq(
     (_, value) =>
