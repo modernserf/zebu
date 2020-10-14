@@ -7,17 +7,27 @@ import {
   Zero,
   Seq,
   Repeat,
-  Structure,
   Lazy,
   SepBy,
+  SeqMany,
 } from "./parser";
 
 type StartToken = "{" | "(" | "[";
 
+const startTokenMatches = {
+  "[": "]",
+  "{": "}",
+  "(": ")",
+};
+
 const id = <T>(x: T) => x;
 const nil = new Zero(() => null);
 const struct = <T>(startToken: StartToken, getParser: () => Parser<T>) =>
-  new Structure(startToken, new Lazy(getParser));
+  new SeqMany<T>((_, x, __) => x as T, [
+    new Literal(startToken),
+    new Lazy(getParser),
+    new Literal(startTokenMatches[startToken]),
+  ]);
 const optNil = <T>(parser: Parser<T>) => new Alt([parser, nil]);
 
 //   Grammar = Rule ++ ";"

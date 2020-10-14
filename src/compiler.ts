@@ -3,7 +3,6 @@ import {
   Zero,
   Literal,
   Parser,
-  Structure,
   Lazy,
   TokType,
   Seq,
@@ -19,6 +18,12 @@ const emptyList = new Zero(() => []);
 function assertUnreachable(_: never): never {
   throw new Error();
 }
+
+const startTokenMatches = {
+  "[": "]",
+  "{": "}",
+  "(": ")",
+};
 
 class Compiler {
   private scope: Map<string, Parser<unknown>>;
@@ -54,10 +59,11 @@ class Compiler {
         return parser;
       }
       case "structure":
-        return new Structure(
-          node.startToken,
-          new Lazy(() => this.compile(node.expr))
-        );
+        return new SeqMany((_, x, __) => x, [
+          new Literal(node.startToken),
+          new Lazy(() => this.compile(node.expr)),
+          new Literal(startTokenMatches[node.startToken]),
+        ]);
       case "maybe":
         return new Alt([this.compile(node.expr), nil]);
       case "repeat0":

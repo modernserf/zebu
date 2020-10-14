@@ -7,12 +7,11 @@ import {
   Seq,
   SeqMany,
   Repeat,
-  Structure,
   SepBy,
   Lazy,
   parse,
 } from "./parser";
-import { StructureStartToken, Token } from "./lexer";
+import { Token } from "./lexer";
 
 const baseToken = {
   index: 0,
@@ -44,15 +43,6 @@ function val(value: unknown): Token {
   };
 }
 
-function struct(startToken: StructureStartToken, value: Token[]): Token {
-  return {
-    type: "structure",
-    startToken,
-    value,
-    ...baseToken,
-  };
-}
-
 const optional = <T>(parser: Parser<T>, getDefault: () => T) =>
   new Alt([parser, new Zero(getDefault)]);
 
@@ -74,30 +64,6 @@ test("simple parsers", () => {
   }).toThrow();
   expect(() => {
     parse([kw("foo")], new TokType("value"));
-  }).toThrow();
-});
-
-test("structures", () => {
-  expect(
-    parse([struct("(", [kw("foo")])], new Structure("(", new Literal("foo")))
-  ).toEqual("foo");
-  expect(() => {
-    parse([], new Structure("(", new Literal("foo")));
-  }).toThrow();
-  expect(() => {
-    parse([struct("(", [kw("bar")])], new Structure("(", new Literal("foo")));
-  }).toThrow();
-  expect(() => {
-    parse([struct("{", [kw("foo")])], new Structure("(", new Literal("foo")));
-  }).toThrow();
-  expect(() => {
-    parse(
-      [struct("(", [kw("foo"), kw("bar")])],
-      new Structure("(", new Literal("foo"))
-    );
-  }).toThrow();
-  expect(() => {
-    parse([kw("foo")], new Structure("(", new Literal("foo")));
   }).toThrow();
 });
 
@@ -177,12 +143,6 @@ test("alt", () => {
   expect(
     parse([val("bar")], new Alt([new Literal("foo"), new TokType("value")]))
   ).toEqual("bar");
-  expect(
-    parse(
-      [struct("{", [])],
-      new Alt([new Literal("foo"), new Structure("{", nulp)])
-    )
-  ).toEqual(null);
   expect(
     parse([], new Alt([new Literal("foo"), new Lazy(() => nulp)]))
   ).toEqual(null);

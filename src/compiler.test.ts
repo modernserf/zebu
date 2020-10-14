@@ -1,6 +1,6 @@
 import { compile } from "./compiler";
 import { parse } from "./parser";
-import { Token, StructureStartToken } from "./lexer";
+import { Token } from "./lexer";
 
 const baseToken = {
   index: 0,
@@ -19,15 +19,6 @@ function kw(value: string): Token {
 function op(value: string): Token {
   return {
     type: "operator",
-    value,
-    ...baseToken,
-  };
-}
-
-function struct(startToken: StructureStartToken, value: Token[]): Token {
-  return {
-    type: "structure",
-    startToken,
     value,
     ...baseToken,
   };
@@ -60,7 +51,7 @@ test("simple parsers", () => {
     startToken: "(",
     expr: { type: "literal", value: "foo" },
   });
-  expect(parse([struct("(", [kw("foo")])], parens)).toEqual("foo");
+  expect(parse([op("("), kw("foo"), op(")")], parens)).toEqual("foo");
 
   const maybe = compile({
     type: "maybe",

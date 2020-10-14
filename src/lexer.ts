@@ -5,11 +5,6 @@ type TokenContent =
       value: unknown;
     }
   | {
-      type: "structure";
-      value: Token[];
-      startToken: StructureStartToken;
-    }
-  | {
       type: "operator";
       value: string;
     }
@@ -43,112 +38,21 @@ class LexerError {
 }
 
 class NoTokenMatchError extends LexerError {}
-class MismatchedBracketError extends LexerError {
-  constructor(
-    public readonly expected: string,
-    public readonly received: string,
-    public readonly index: number,
-    public readonly outerIndex: number
-  ) {
-    super(index, outerIndex);
-  }
-}
-
-const startTokenMatches = {
-  "[": "]",
-  "{": "}",
-  "(": ")",
-};
-
-const endTokenMatches = {
-  "]": "[",
-  "}": "{",
-  ")": "(",
-};
 
 class LexerState {
   index = 0;
   outerIndex = 0;
-  private stack: Array<{
-    lastTokens: Token[];
-    structure: Token & { type: "structure" };
-  }> = [];
   private tokens: Token[] = [];
   constructor(
     public readonly strings: readonly string[],
     public readonly interps: unknown[]
-  ) {
-    this.tokens = [];
-    this.stack = [];
-  }
+  ) {}
   getTokens() {
-    if (this.stack.length) {
-      const { structure } = this.stack[this.stack.length - 1];
-      throw new MismatchedBracketError(
-        startTokenMatches[structure.startToken],
-        "end",
-        this.index,
-        this.outerIndex
-      );
-    }
     return this.tokens;
   }
   push(token: Token | undefined) {
     if (!token) return;
     this.tokens.push(token);
-  }
-  start(startToken: StructureStartToken) {
-    const nextTokens = [];
-    const structure: Token = {
-      type: "structure",
-      value: nextTokens,
-      startToken,
-      index: this.index,
-      outerIndex: this.outerIndex,
-      length: 0, // filled in in `end`
-    };
-    this.stack.push({ structure, lastTokens: this.tokens });
-    this.tokens = nextTokens;
-  }
-  end(endToken: "}" | "]" | ")") {
-    const expectedStartToken = endTokenMatches[endToken];
-    const stackFrame = this.stack.pop();
-    if (!stackFrame) {
-      throw new MismatchedBracketError(
-        expectedStartToken,
-        "end",
-        this.index,
-        this.outerIndex
-      );
-    }
-
-    this.tokens = stackFrame.lastTokens;
-    const lastStructure = stackFrame.structure;
-
-    if (lastStructure.startToken !== expectedStartToken) {
-      throw new MismatchedBracketError(
-        expectedStartToken,
-        lastStructure.startToken,
-        this.index,
-        this.outerIndex
-      );
-    }
-
-    if (lastStructure.outerIndex === this.outerIndex) {
-      lastStructure.length = this.outerIndex - lastStructure.outerIndex;
-    } else {
-      lastStructure.length =
-        // rest of first string
-        this.strings[lastStructure.outerIndex].length -
-        lastStructure.index +
-        // all strings in between
-        this.strings
-          .slice(lastStructure.outerIndex + 1, this.outerIndex)
-          .reduce((sum, str) => sum + str.length, 0) +
-        // last string to this point
-        this.index;
-    }
-    this.tokens.push(lastStructure);
   }
   getInterpolation() {
     let token: (Token & { type: "value" }) | undefined;
@@ -253,31 +157,7 @@ function mainState(lexerState: LexerState) {
               outerIndex: lexerState.outerIndex,
               length: matchedString.length,
             });
-          } else if (match[9]) {
-            const ch = match[9];
-            switch (ch) {
-              case "[":
-              case "{":
-              case "(":
-                lexerState.start(ch);
-                break;
-              case "]":
-              case "}":
-              case ")":
-                lexerState.end(ch);
-                break;
-              case ",":
-              case ";":
-                lexerState.push({
-                  type: "operator",
-                  value: ch,
-                  index: lexerState.index,
-                  outerIndex: lexerState.outerIndex,
-                  length: 1,
-                });
-                break;
-            }
-          } else if (match[10]) {
+          } else if (match[9] || match[10]) {
             lexerState.push({
               type: "operator",
               value: matchedString,

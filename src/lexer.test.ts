@@ -11,47 +11,21 @@ function strip(token: Token) {
 }
 
 test("basic tokens", () => {
-  expect(tok`foo "bar" -123.45 + 0xDEADBEEF,; 'baz'`.map(strip)).toEqual([
+  expect(tok`foo "bar" { -123.45 } + 0xDEADBEEF,; 'baz'`.map(strip)).toEqual([
     { type: "identifier", value: "foo" },
     { type: "value", value: "bar" },
+    { type: "operator", value: "{" },
     { type: "value", value: -123.45 },
+    { type: "operator", value: "}" },
     { type: "operator", value: "+" },
     { type: "value", value: 0xdeadbeef },
     { type: "operator", value: "," },
     { type: "operator", value: ";" },
     { type: "value", value: "baz" },
   ]);
-});
 
-test("structures", () => {
-  const toks: any = tok`(foo [${1} { 2: 3 } ${4}])`;
-  expect(toks).toMatchObject([{ type: "structure", startToken: "(" }]);
-  expect(toks[0].value).toMatchObject([
-    { type: "identifier", value: "foo" },
-    { type: "structure", startToken: "[" },
-  ]);
-  expect(toks[0].value[1].value).toMatchObject([
-    { type: "value", value: 1 },
-    { type: "structure", startToken: "{" },
-    { type: "value", value: 4 },
-  ]);
-  expect(toks[0].value[1].value[1].value).toMatchObject([
-    { type: "value", value: 2 },
-    { type: "operator", value: ":" },
-    { type: "value", value: 3 },
-  ]);
-});
-
-test("structure errors", () => {
-  expect(() => tok`{ foo ]`).toThrow();
-  expect(() => tok`{ foo`).toThrow();
-  expect(() => tok`foo }`).toThrow();
   expect(() => tok`"foo`).toThrow();
-  expect(
-    () => tok`
-    "foo
-    bar"`
-  ).toThrow();
+  expect(() => tok`"\n"`).toThrow();
 });
 
 test("interpolation", () => {

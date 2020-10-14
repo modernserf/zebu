@@ -1,4 +1,4 @@
-import { StructureStartToken, Token } from "./lexer";
+import { Token } from "./lexer";
 
 type Brand<K, T> = K & { __brand: T };
 
@@ -51,8 +51,6 @@ type FirstTokenOption = Brand<string, "FirstTokenOption">;
 type FirstTokenOptions = Set<FirstTokenOption | null>;
 const brandLiteral = (value: string) => `literal-${value}` as FirstTokenOption;
 const brandType = (type: string) => `type-${type}` as FirstTokenOption;
-const brandStructure = (startToken: StructureStartToken) =>
-  `startToken-${startToken}` as FirstTokenOption;
 
 type LiteralToken = Token & { value: string };
 
@@ -91,9 +89,7 @@ function candidatesForToken<T>(
 
   const candidates = [];
 
-  if (token.type === "structure") {
-    pushMapItems(candidates, map, brandStructure(token.startToken));
-  } else if (isLiteral(token)) {
+  if (isLiteral(token)) {
     pushMapItems(candidates, map, brandLiteral(token.value));
     pushMapItems(candidates, map, brandType(token.type));
   } else {
@@ -154,33 +150,6 @@ export class TokType<Type extends TokenType>
     if (!tok) return err("eof");
     if (tok.type !== this.type) return err(`not a ${this.type}`);
     return ok(tok.value as ValueForType<Token, Type>);
-  }
-}
-
-export class Structure<T> implements Parser<T> {
-  firstTokenOptions: FirstTokenOptions;
-  constructor(
-    private readonly startToken: StructureStartToken,
-    private readonly parser: Parser<T>
-  ) {
-    this.firstTokenOptions = new Set([brandStructure(this.startToken)]);
-  }
-  parse(subject: ParseSubject): ParseOutput<T> {
-    const err = subject.save();
-    const tok = subject.next();
-    if (!tok) return err("eof");
-    if (tok.type !== "structure" || tok.startToken !== this.startToken) {
-      return err("no match");
-    }
-
-    // TODO: subject should instantiate this, and pass info from parent to child
-    const innerSubject = new ParseSubject(tok.value);
-    const result = this.parser.parse(innerSubject);
-    if (!innerSubject.done()) {
-      return err("incomplete inner parse");
-    }
-
-    return result;
   }
 }
 
