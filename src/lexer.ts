@@ -185,9 +185,26 @@ class LexerState {
 }
 
 export const identifierOrOperator = /^(?:(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*|[!@#%^&*\-+=|/:<>.?~]+|[,;])$/u;
+
 // each regex state is a set of capture groups
-// 1: whitespace 2: "//" 3: "/*" 4, 5, 6, 7: number 8: identifier 9: operator
-const mainPattern = /([ \t\n]+)|(\/\/)|(\/\*)|(0x[0-9A-Fa-f_]+)|(0o[0-7_]+)|(0b[0-1_]+)|(-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?)|((?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*)|([!@#%^&*\-+=|/:<>.?~]+)/uy;
+const mainPattern = new RegExp(
+  [
+    /[ \t\n]+/, // whitespace
+    /\/\//, // line comment
+    /\/\*/, // block comment
+    /0x[0-9A-Fa-f_]+/, // number
+    /0o[0-7_]+/,
+    /0b[0-1_]+/,
+    /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/,
+    /(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*/, // identifier
+    /[;{}()[\],]/, // one-char operator
+    /[!@#%^&*\-+=|/:<>.?~]+/, // multi-char operator
+  ]
+    .map((re) => `(${re.source})`)
+    .join("|"),
+  "uy"
+);
+
 function mainState(lexerState: LexerState) {
   let ch: string | undefined;
   while (lexerState.hasStrings()) {
@@ -201,29 +218,6 @@ function mainState(lexerState: LexerState) {
         case `"`:
           lexerState.index++;
           quote(doubleQuotePattern, lexerState);
-          break;
-        case "[":
-        case "{":
-        case "(":
-          lexerState.index++;
-          lexerState.start(ch);
-          break;
-        case "]":
-        case "}":
-        case ")":
-          lexerState.index++;
-          lexerState.end(ch);
-          break;
-        case ",":
-        case ";":
-          lexerState.index++;
-          lexerState.push({
-            type: "operator",
-            value: ch,
-            index: lexerState.index,
-            outerIndex: lexerState.outerIndex,
-            length: 1,
-          });
           break;
         default: {
           const lastIndex = lexerState.index;
@@ -239,9 +233,9 @@ function mainState(lexerState: LexerState) {
           const matchedString = match[0];
 
           if (match[2]) {
-            lineComment(lexerState);
+            comment(lineCommentPattern, lexerState);
           } else if (match[3]) {
-            blockComment(lexerState);
+            comment(blockCommentPattern, lexerState);
           } else if (match[4] || match[5] || match[6] || match[7]) {
             const value = Number(matchedString);
             lexerState.push({
@@ -260,6 +254,30 @@ function mainState(lexerState: LexerState) {
               length: matchedString.length,
             });
           } else if (match[9]) {
+            const ch = match[9];
+            switch (ch) {
+              case "[":
+              case "{":
+              case "(":
+                lexerState.start(ch);
+                break;
+              case "]":
+              case "}":
+              case ")":
+                lexerState.end(ch);
+                break;
+              case ",":
+              case ";":
+                lexerState.push({
+                  type: "operator",
+                  value: ch,
+                  index: lexerState.index,
+                  outerIndex: lexerState.outerIndex,
+                  length: 1,
+                });
+                break;
+            }
+          } else if (match[10]) {
             lexerState.push({
               type: "operator",
               value: matchedString,
@@ -315,22 +333,11 @@ function quote(pattern: RegExp, lexerState: LexerState) {
 }
 
 const lineCommentPattern = /([^\n]+)|(\n)/y;
-function lineComment(lexerState: LexerState) {
-  while (lexerState.hasStrings()) {
-    while (lexerState.nextChar()) {
-      const match = lexerState.matchPattern(lineCommentPattern);
-      // istanbul ignore next
-      if (!match || match[2]) return;
-    }
-    lexerState.getInterpolation();
-  }
-}
-
 const blockCommentPattern = /((?:\*[^/]|[^*])+)|(\*\/)/y;
-function blockComment(lexerState: LexerState) {
+function comment(pattern: RegExp, lexerState: LexerState) {
   while (lexerState.hasStrings()) {
     while (lexerState.nextChar()) {
-      const match = lexerState.matchPattern(blockCommentPattern);
+      const match = lexerState.matchPattern(pattern);
       // istanbul ignore next
       if (!match || match[2]) return;
     }
