@@ -1,4 +1,4 @@
-import { compile } from "./compiler";
+import { compile as compileBase } from "./compiler";
 import { parse } from "./parser";
 import { Token } from "./lexer";
 
@@ -23,6 +23,8 @@ function op(value: string): Token {
     ...baseToken,
   };
 }
+
+const compile = (ast) => compileBase(ast).parser;
 
 test("simple parsers", () => {
   expect(() => {

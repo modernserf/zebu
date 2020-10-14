@@ -2,8 +2,31 @@ import { AST, grammar } from "./ast";
 import { parse } from "./parser";
 import { tokenize } from "./lexer";
 
+const defaultLiterals = [
+  "{",
+  "}",
+  "(",
+  ")",
+  "[",
+  "]",
+  "#",
+  ":",
+  ";",
+  ".",
+  ",",
+  "-",
+  "+",
+  "/",
+  "|",
+  "=",
+  "++",
+  "**",
+  "*",
+  "?",
+];
+
 const ast = (strs: TemplateStringsArray, ...xs: unknown[]) => {
-  return parse(tokenize(strs.raw, xs), grammar);
+  return parse(tokenize(strs.raw, xs, defaultLiterals), grammar);
 };
 
 test("ast", () => {

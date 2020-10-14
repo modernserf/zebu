@@ -22,7 +22,7 @@ export const op = lang`
   Expr      = Pattern ":" value  : 
     ${( pattern: string[], _: unknown, fn: SeqFn): OpExpr => ({ pattern, fn })};
   Pattern   = value+;
-  RootRule  = "root" value       : ${(_: unknown, x: unknown) => x};
+  RootRule  = "root" identifier  : ${(_: unknown, x: unknown) => x};
   Fixity    = "left" | "right" | "pre" | "post";
 ` as ZebuLanguageReturning<ZebuLanguage>;
 
@@ -170,6 +170,6 @@ function compileOp(
   rootExpr: Parser<unknown> | null
 ): ZebuLanguage {
   const ast = buildAST(rules, rootExpr);
-  const parser = compile(ast);
-  return createLanguage(parser);
+  const { parser, literals } = compile(ast);
+  return createLanguage(parser, literals);
 }

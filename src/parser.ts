@@ -54,8 +54,13 @@ const brandType = (type: string) => `type-${type}` as FirstTokenOption;
 
 type LiteralToken = Token & { value: string };
 
+// TODO: remove 'identifier'
 function isLiteral(token: Token): token is LiteralToken {
-  return token.type === "identifier" || token.type === "operator";
+  return (
+    token.type === "identifier" ||
+    token.type === "keyword" ||
+    token.type === "operator"
+  );
 }
 
 type CandidateMap<T> = Map<FirstTokenOption | null, Parser<T>[]>;

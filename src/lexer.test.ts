@@ -1,6 +1,30 @@
 import { Token, tokenize } from "./lexer";
+
+const defaultLiterals = [
+  "{",
+  "}",
+  "(",
+  ")",
+  "[",
+  "]",
+  "#",
+  ":",
+  ";",
+  ".",
+  ",",
+  "-",
+  "+",
+  "/",
+  "|",
+  "=",
+  "++",
+  "**",
+  "*",
+  "?",
+];
+
 function tok(strs: TemplateStringsArray, ...interps: unknown[]) {
-  return tokenize(strs.raw, interps);
+  return tokenize(strs.raw, interps, defaultLiterals);
 }
 
 function strip(token: Token) {
