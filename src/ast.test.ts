@@ -1,32 +1,10 @@
 import { AST, grammar } from "./ast";
+import { rootLanguageLiterals } from "./compiler";
 import { parse } from "./parser";
 import { tokenize } from "./lexer";
 
-const defaultLiterals = [
-  "{",
-  "}",
-  "(",
-  ")",
-  "[",
-  "]",
-  "#",
-  ":",
-  ";",
-  ".",
-  ",",
-  "-",
-  "+",
-  "/",
-  "|",
-  "=",
-  "++",
-  "**",
-  "*",
-  "?",
-];
-
 const ast = (strs: TemplateStringsArray, ...xs: unknown[]) => {
-  return parse(tokenize(strs.raw, xs, defaultLiterals), grammar);
+  return parse(tokenize(strs.raw, xs, rootLanguageLiterals), grammar);
 };
 
 test("ast", () => {
@@ -124,10 +102,11 @@ test("ast", () => {
   };
 
   expect(jsonAST).toEqual(match);
+});
 
+test("other nodes", () => {
   const otherNodes = ast`
     Main = #( value ++ "," )+ | Expr?;
-    Expr = (include ${___})*;
   `;
 
   const matchOtherNodes: AST = {
@@ -157,10 +136,6 @@ test("ast", () => {
         },
         name: "Main",
       },
-      {
-        expr: { expr: { type: "include", value: ___ as any }, type: "repeat0" },
-        name: "Expr",
-      },
     ],
     type: "ruleset",
   };
@@ -186,7 +161,4 @@ test("ast errors and defaults", () => {
 
   const badLiteral2 = ast`"{"`;
   expect(badLiteral2).toMatchObject({ type: "error" });
-
-  const badInclude = ast`include ${null}`;
-  expect(badInclude).toMatchObject({ type: "error" });
 });

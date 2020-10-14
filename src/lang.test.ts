@@ -48,7 +48,7 @@ test("repeaters", () => {
   expect(() => nonEmptyList`()`).toThrow();
 });
 
-test("interpolated parser", () => {
+test.skip("interpolated parser", () => {
   const num = lang`value`;
   const list = lang`(include ${() => num})+`;
   expect(list`1 2 3`).toEqual([1, 2, 3]);

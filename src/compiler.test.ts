@@ -10,6 +10,14 @@ const baseToken = {
 
 function kw(value: string): Token {
   return {
+    type: "keyword",
+    value,
+    ...baseToken,
+  };
+}
+
+function id(value: string): Token {
+  return {
     type: "identifier",
     value,
     ...baseToken,
@@ -37,7 +45,7 @@ test("simple parsers", () => {
   expect(() => compile({ type: "error", message: "" })).toThrow();
 
   const ident = compile({ type: "identifier", value: "identifier" });
-  expect(parse([kw("foo")], ident)).toEqual("foo");
+  expect(parse([id("foo")], ident)).toEqual("foo");
 
   const literal = compile({ type: "literal", value: "foo" });
   expect(parse([kw("foo")], literal)).toEqual("foo");
@@ -68,14 +76,14 @@ test("simple parsers", () => {
     expr: { type: "identifier", value: "identifier" },
   });
   expect(parse([], repeat0)).toEqual([]);
-  expect(parse([kw("foo"), kw("bar")], repeat0)).toEqual(["foo", "bar"]);
+  expect(parse([id("foo"), id("bar")], repeat0)).toEqual(["foo", "bar"]);
 
   const repeat1 = compile({
     type: "repeat1",
     expr: { type: "identifier", value: "identifier" },
   });
   expect(() => parse([], repeat1)).toThrow();
-  expect(parse([kw("foo"), kw("bar")], repeat1)).toEqual(["foo", "bar"]);
+  expect(parse([id("foo"), id("bar")], repeat1)).toEqual(["foo", "bar"]);
 
   const sepBy0 = compile({
     type: "sepBy0",
@@ -83,11 +91,11 @@ test("simple parsers", () => {
     separator: { type: "literal", value: "," },
   });
   expect(parse([], sepBy0)).toEqual([]);
-  expect(parse([kw("foo"), op(","), kw("bar")], sepBy0)).toEqual([
+  expect(parse([id("foo"), op(","), id("bar")], sepBy0)).toEqual([
     "foo",
     "bar",
   ]);
-  expect(parse([kw("foo"), op(","), kw("bar"), op(",")], sepBy0)).toEqual([
+  expect(parse([id("foo"), op(","), id("bar"), op(",")], sepBy0)).toEqual([
     "foo",
     "bar",
   ]);
@@ -98,11 +106,11 @@ test("simple parsers", () => {
     separator: { type: "literal", value: "," },
   });
   expect(() => parse([], sepBy1)).toThrow();
-  expect(parse([kw("foo"), op(","), kw("bar")], sepBy1)).toEqual([
+  expect(parse([id("foo"), op(","), id("bar")], sepBy1)).toEqual([
     "foo",
     "bar",
   ]);
-  expect(parse([kw("foo"), op(","), kw("bar"), op(",")], sepBy1)).toEqual([
+  expect(parse([id("foo"), op(","), id("bar"), op(",")], sepBy1)).toEqual([
     "foo",
     "bar",
   ]);
@@ -115,7 +123,7 @@ test("simple parsers", () => {
     ],
     fn: (_, x) => x,
   });
-  expect(parse([kw("def"), kw("foo")], seq)).toEqual("foo");
+  expect(parse([kw("def"), id("foo")], seq)).toEqual("foo");
 
   const alt = compile({
     type: "alt",

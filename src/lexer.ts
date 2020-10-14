@@ -179,7 +179,7 @@ class Lexer {
           });
         } else if (match[8]) {
           lexerState.push({
-            type: "identifier",
+            type: this.keywords.has(matchedString) ? "keyword" : "identifier",
             value: matchedString,
             index: lastIndex,
             outerIndex: lexerState.outerIndex,

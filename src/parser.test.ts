@@ -21,7 +21,7 @@ const baseToken = {
 
 function kw(value: string): Token {
   return {
-    type: "identifier",
+    type: "keyword",
     value,
     ...baseToken,
   };
@@ -49,7 +49,7 @@ const optional = <T>(parser: Parser<T>, getDefault: () => T) =>
 test("simple parsers", () => {
   expect(parse([], new Zero(() => 123))).toEqual(123);
   expect(parse([kw("foo")], new Literal("foo"))).toEqual("foo");
-  expect(parse([kw("foo")], new TokType("identifier"))).toEqual("foo");
+  expect(parse([kw("foo")], new TokType("keyword"))).toEqual("foo");
   expect(() => {
     parse([], new Literal("foo"));
   }).toThrow();
@@ -163,7 +163,7 @@ test("alt favors literal parser", () => {
     parse(
       [kw("foo"), val("bar")],
       new Alt([
-        new Seq(() => 1, new TokType("identifier"), new TokType("value")),
+        new Seq(() => 1, new TokType("keyword"), new TokType("value")),
         new Seq(() => 2, new Literal("foo"), new TokType("value")),
       ])
     )
@@ -175,7 +175,7 @@ test("alt favors literal parser", () => {
         new Seq(
           () => 1,
           optional(new TokType("value"), () => null),
-          new TokType("identifier")
+          new TokType("keyword")
         ),
         new Seq(
           () => 2,
@@ -192,8 +192,8 @@ test("alt goes in order when ambiguous", () => {
     parse(
       [kw("foo"), kw("bar")],
       new Alt([
-        new Seq(() => 1, new TokType("identifier"), new Literal("foo")),
-        new Seq(() => 2, new TokType("identifier"), new Literal("bar")),
+        new Seq(() => 1, new TokType("keyword"), new Literal("foo")),
+        new Seq(() => 2, new TokType("keyword"), new Literal("bar")),
       ])
     )
   ).toEqual(2);

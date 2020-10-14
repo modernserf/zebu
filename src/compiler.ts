@@ -48,6 +48,7 @@ class Compiler {
       ["identifier", new TokType("identifier")],
       ["value", new TokType("value")],
       ["operator", new TokType("operator")],
+      ["keyword", new TokType("keyword")],
     ]);
   }
   compile(node: AST) {
