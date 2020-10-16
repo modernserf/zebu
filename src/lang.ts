@@ -66,6 +66,7 @@ export const rootLanguageLiterals = [
   "identifier",
   "operator",
   "keyword",
+  "nil",
 ];
 
 export const lang = createLanguage(

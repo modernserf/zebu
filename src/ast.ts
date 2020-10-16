@@ -57,7 +57,6 @@ export type AST =
   | { type: "literal"; value: string }
   | { type: "terminal"; value: Token["type"] }
   | { type: "identifier"; value: string }
-  | { type: "include"; value: AST }
   | { type: "structure"; startToken: string; endToken: string; expr: AST }
   | { type: "maybe"; expr: AST }
   | { type: "repeat0"; expr: AST }
@@ -90,7 +89,7 @@ const baseExpr = new Alt<AST>([
       if (!value || !value.ast) {
         return { type: "error", message: "include must be a grammar" };
       }
-      return { type: "include", value: value.ast as AST };
+      return value.ast as AST;
     },
     new Literal("include"),
     value

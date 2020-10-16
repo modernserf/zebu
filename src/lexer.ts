@@ -1,3 +1,5 @@
+import { partition } from "./util";
+
 export type StructureStartToken = "{" | "[" | "(";
 type TokenContent =
   | {
@@ -92,7 +94,7 @@ class LexerState {
   }
 }
 
-const identifierPattern = /(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*/u;
+export const identifierPattern = /(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*/u;
 const singleQuotePattern = /((?:\\['\\]|[^\n'\\])+)|(')/y;
 const doubleQuotePattern = /((?:\\["\\]|[^\n"\\])+)|(")/y;
 
@@ -252,21 +254,6 @@ export function tokenize(
   literals: string[]
 ): Token[] {
   return new Lexer(literals).run(strs, interps);
-}
-
-function partition<T>(iter: Iterable<T>, fn: (x: T) => boolean): [T[], T[]] {
-  const trues: T[] = [];
-  const falses: T[] = [];
-
-  for (const value of iter) {
-    if (fn(value)) {
-      trues.push(value);
-    } else {
-      falses.push(value);
-    }
-  }
-
-  return [trues, falses];
 }
 
 function reEscape(s: string) {

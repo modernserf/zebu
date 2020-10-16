@@ -105,10 +105,6 @@ class Compiler {
         }
         return new RuleReference(node.value, this.scope);
       }
-      case "include": {
-        const res = this.compileExpr(node.value);
-        return res;
-      }
       case "structure":
         this.literals.add(node.startToken);
         this.literals.add(node.endToken);
