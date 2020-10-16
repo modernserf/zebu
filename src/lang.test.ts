@@ -23,7 +23,7 @@ test("recursive rules", () => {
   expect(math`-(-(123))`).toEqual(123);
 });
 
-test("repeaters", () => {
+test.skip("repeaters", () => {
   const list = lang`
     Expr  = #( Expr* )
           | identifier
@@ -48,8 +48,7 @@ test("repeaters", () => {
   expect(() => nonEmptyList`()`).toThrow();
 });
 
-test.skip("interpolated parser", () => {
-  const num = lang`value`;
-  const list = lang`(include ${() => num})+`;
+test("interpolated parser", () => {
+  const list = lang`(include ${lang`value`})+`;
   expect(list`1 2 3`).toEqual([1, 2, 3]);
 });

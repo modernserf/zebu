@@ -1,5 +1,5 @@
 import { AST, grammar } from "./ast";
-import { rootLanguageLiterals } from "./compiler";
+import { rootLanguageLiterals } from "./lang";
 import { parse } from "./parser";
 import { tokenize } from "./lexer";
 
@@ -32,7 +32,7 @@ test("ast", () => {
       {
         expr: {
           exprs: [
-            { type: "identifier", value: "value" },
+            { type: "terminal", value: "value" },
             { type: "literal", value: ":" },
             { type: "identifier", value: "Expr" },
           ],
@@ -76,7 +76,7 @@ test("ast", () => {
               fn: ___,
               type: "seq",
             },
-            { type: "identifier", value: "value" },
+            { type: "terminal", value: "value" },
             {
               exprs: [{ type: "literal", value: "true" }],
               fn: ___,
@@ -117,7 +117,7 @@ test("other nodes", () => {
             {
               expr: {
                 expr: {
-                  expr: { type: "identifier", value: "value" },
+                  expr: { type: "terminal", value: "value" },
                   separator: { type: "literal", value: "," },
                   type: "sepBy1",
                 },

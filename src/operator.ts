@@ -1,13 +1,11 @@
-import { AST, ASTExpr } from "./ast";
+import { AST } from "./ast";
 import {
-  createLanguage,
   lang,
   ZebuLanguageReturning,
   ZebuLanguage,
+  createLanguage2,
 } from "./lang";
 import { identifierOrOperator } from "./lexer";
-import { Parser } from "./parser";
-import { compile } from "./compiler";
 
 type Fixity = "left" | "right" | "pre" | "post";
 type SeqFn = (...xs: unknown[]) => unknown;
@@ -16,7 +14,7 @@ export type Rule = { fixity: Fixity; operators: OpExpr[] };
 
 // prettier-ignore
 export const op = lang`
-  Program   = Rule* RootRule?    : ${compileOp};
+  Program   = Rule* RootRule?    : ${(rules, root) =>  createLanguage2(buildAST(rules, root))};
   Rule      = Fixity Expr+       : 
     ${(fixity: string, operators: OpExpr[]): Rule => ({ fixity: fixity as Fixity, operators })};
   Expr      = Pattern ":" value  : 
@@ -27,7 +25,7 @@ export const op = lang`
 ` as ZebuLanguageReturning<ZebuLanguage>;
 
 // TODO: this is basically the same logic as in ast.ts, should it be shared?
-function formatNode(x: string): ASTExpr {
+function formatNode(x: string): AST {
   if (typeof x !== "string" || !identifierOrOperator.test(x)) {
     return { type: "error", message: "invalid pattern" };
   }
@@ -41,7 +39,7 @@ const reduceRight = (fns: SeqFn[], value: unknown) =>
 
 // converts `"is" : ${x} | "is" "not" : ${y}`
 // into `"is" (nil : ${x} | "not" : ${y})`
-export function getOpAlts(ops: OpExpr[]): ASTExpr {
+export function getOpAlts(ops: OpExpr[]): AST {
   const patternByFirst = new Map<string | null, OpExpr[]>();
   for (const {
     pattern: [first, ...rest],
@@ -53,7 +51,7 @@ export function getOpAlts(ops: OpExpr[]): ASTExpr {
     patternByFirst.set(key, arr);
   }
 
-  const alts: ASTExpr[] = [];
+  const alts: AST[] = [];
 
   for (const [key, ops] of patternByFirst) {
     if (key === null) {
@@ -87,14 +85,14 @@ export function getOpAlts(ops: OpExpr[]): ASTExpr {
   };
 }
 
-export function buildAST(rules: Rule[], rootExpr: Parser<unknown> | null): AST {
+export function buildAST(rules: Rule[], rootExpr: string): AST {
   // apply rules bottom-to-top
   const topExpr = rules.reduceRight(
-    (baseExpr: ASTExpr, rule: Rule): ASTExpr => {
+    (baseExpr: AST, rule: Rule): AST => {
       const opAlts = getOpAlts(rule.operators);
       switch (rule.fixity) {
         case "left": {
-          const withOp: ASTExpr = {
+          const withOp: AST = {
             type: "seq",
             exprs: [opAlts, baseExpr],
             fn: (op: SeqFn, right) => (left) => op(left, right),
@@ -106,7 +104,7 @@ export function buildAST(rules: Rule[], rootExpr: Parser<unknown> | null): AST {
           };
         }
         case "right": {
-          const withOp: ASTExpr = {
+          const withOp: AST = {
             type: "seq",
             exprs: [baseExpr, opAlts],
             fn: (left, op: SeqFn) => (right) => op(left, right),
@@ -138,9 +136,10 @@ export function buildAST(rules: Rule[], rootExpr: Parser<unknown> | null): AST {
     { type: "identifier", value: "BaseExpr" }
   );
 
-  const rootASTNode: ASTExpr = rootExpr
-    ? { type: "include", value: () => rootExpr }
-    : { type: "identifier", value: "value" };
+  const rootASTNode: AST = {
+    type: "identifier",
+    value: rootExpr || "value",
+  };
 
   return {
     type: "ruleset",
@@ -163,13 +162,4 @@ export function buildAST(rules: Rule[], rootExpr: Parser<unknown> | null): AST {
       },
     ],
   };
-}
-
-function compileOp(
-  rules: Rule[],
-  rootExpr: Parser<unknown> | null
-): ZebuLanguage {
-  const ast = buildAST(rules, rootExpr);
-  const { parser, literals } = compile(ast);
-  return createLanguage(parser, literals);
 }

@@ -3,59 +3,89 @@ import {
   Zero,
   Literal,
   Parser,
-  Lazy,
   TokType,
   Seq,
   SeqMany,
   Alt,
   Repeat,
   SepBy,
+  ParseSubject,
 } from "./parser";
 
 const nil = new Zero(() => null);
 const emptyList = new Zero(() => []);
 
-function assertUnreachable(_: never): never {
-  throw new Error();
+function assertUnreachable(value: never): never {
+  throw new Error(`shouldnt have gotten ${value}`);
 }
 
-export const rootLanguageLiterals = [
-  "{",
-  "}",
-  "(",
-  ")",
-  "[",
-  "]",
-  "#",
-  ":",
-  ";",
-  ",",
-  "+",
-  "|",
-  "=",
-  "++",
-  "**",
-  "*",
-  "?",
-];
+class Scope<Key, Value> {
+  constructor(
+    private readonly map: Map<Key, Value>,
+    private readonly parent: Scope<Key, Value> | null = null
+  ) {}
+  get(key: Key): Value | undefined {
+    if (this.map.has(key)) return this.map.get(key);
+    if (this.parent) return this.parent.get(key);
+    return undefined;
+  }
+  has(key: Key): boolean {
+    if (this.map.has(key)) return true;
+    if (this.parent) return this.parent.has(key);
+    return false;
+  }
+  set(key: Key, value: Value) {
+    this.map.set(key, value);
+    return this;
+  }
+  create() {
+    return new Scope(new Map(), this);
+  }
+  pop() {
+    if (this.parent) return this.parent;
+    throw new Error("no outer scope");
+  }
+  *keys() {
+    yield* this.map.keys();
+    if (this.parent) yield* this.parent.keys();
+  }
+}
+
+// TODO: add error tracking stuff
+class RuleReference implements Parser<unknown> {
+  constructor(
+    private name: string,
+    private scope: Scope<string, Parser<unknown> | null>
+  ) {}
+  get firstTokenOptions() {
+    const parser = this.scope.get(this.name);
+    if (!parser) throw new Error("unknown parser (firstTokenOptions)");
+    return parser.firstTokenOptions;
+  }
+  parse(subject: ParseSubject) {
+    const parser = this.scope.get(this.name);
+    if (!parser) throw new Error("unknown parser (parse)");
+    return parser.parse(subject);
+  }
+}
 
 class Compiler {
-  private scope: Map<string, Parser<unknown>>;
-  private ruleNames: Set<string> = new Set();
+  private scope: Scope<string, Parser<unknown> | null>;
   private literals: Set<string> = new Set();
   constructor() {
-    this.scope = new Map<string, Parser<unknown>>([
-      ["identifier", new TokType("identifier")],
-      ["value", new TokType("value")],
-      ["operator", new TokType("operator")],
-      ["keyword", new TokType("keyword")],
-    ]);
+    this.scope = new Scope(
+      new Map<string, Parser<unknown>>([
+        ["identifier", new TokType("identifier")],
+        ["value", new TokType("value")],
+        ["operator", new TokType("operator")],
+        ["keyword", new TokType("keyword")],
+      ])
+    );
   }
   compile(node: AST) {
-    return {
-      parser: this.compileExpr(node),
-      literals: Array.from(this.literals),
-    };
+    const parser = this.compileExpr(node);
+    const literals = Array.from(this.literals);
+    return { parser, literals };
   }
 
   private compileExpr(node: AST): Parser<unknown> {
@@ -67,27 +97,24 @@ class Compiler {
       case "literal":
         this.literals.add(node.value);
         return new Literal(node.value);
+      case "terminal":
+        return new TokType(node.value);
       case "identifier": {
-        const value = this.scope.get(node.value);
-        if (!value) {
-          if (this.ruleNames.has(node.value)) {
-            throw new Error("rule cannot be used here");
-          }
-          throw new Error("unknown identifier");
+        if (!this.scope.has(node.value)) {
+          throw new Error(`unknown identifier ${node.value}`);
         }
-        return value;
+        return new RuleReference(node.value, this.scope);
       }
       case "include": {
-        const parser = node.value(this.scope);
-        if (typeof parser.parse !== "function") throw new Error("not a parser");
-        return parser;
+        const res = this.compileExpr(node.value);
+        return res;
       }
       case "structure":
         this.literals.add(node.startToken);
         this.literals.add(node.endToken);
         return new SeqMany((_, x, __) => x, [
           new Literal(node.startToken),
-          new Lazy(() => this.compileExpr(node.expr)),
+          this.compileExpr(node.expr),
           new Literal(node.endToken),
         ]);
       case "maybe":
@@ -125,14 +152,21 @@ class Compiler {
     }
   }
   private compileRuleset(ruleset: Array<{ name: string; expr: AST }>) {
-    this.ruleNames = new Set(ruleset.map((rule) => rule.name));
+    this.scope = this.scope.create();
+    // first, add nulls as placeholders to scope
+    for (const { name } of ruleset) {
+      this.scope.set(name, null);
+    }
+
+    // then, try compiling the rules
+    // rules will mostly be defined top to bottom, so start from bottom
     let lastParser: Parser<unknown> = nil;
-    // Go in reverse so bottom rules are defined before top ones
     for (const { name, expr } of ruleset.slice().reverse()) {
       lastParser = this.compileExpr(expr);
       this.scope.set(name, lastParser);
     }
 
+    this.scope = this.scope.pop();
     return lastParser;
   }
 }

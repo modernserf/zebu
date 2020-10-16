@@ -1,9 +1,13 @@
-import { grammar } from "./ast";
-import { compile, rootLanguageLiterals } from "./compiler";
+import { grammar, AST } from "./ast";
+import { compile } from "./compiler";
 import { tokenize } from "./lexer";
-import { parse, Parser, ParseSubject, Seq, Zero } from "./parser";
+import { parse, Parser, Seq, Zero } from "./parser";
 
-export type ZebuLanguageReturning<Type> = Parser<unknown> &
+type Foo = {
+  ast: AST;
+  compile: () => void;
+};
+export type ZebuLanguageReturning<Type> = Foo &
   ((strs: TemplateStringsArray, ...xs: unknown[]) => Type);
 
 export type ZebuLanguage = ZebuLanguageReturning<unknown>;
@@ -15,20 +19,56 @@ export function createLanguage(
   function parser(strs: TemplateStringsArray, ...xs: unknown[]) {
     return parse(tokenize(strs.raw, xs, literals), parserCore);
   }
-  parser.firstTokenOptions = parserCore.firstTokenOptions;
-  parser.parse = (state: ParseSubject) => parserCore.parse(state);
+  parser.ast = null;
+  parser.compile = () => undefined;
 
   return parser;
 }
 
+export function createLanguage2(ast: AST): ZebuLanguage {
+  let compiled: { parser: Parser<unknown>; literals: string[] } | null;
+
+  // this is lazy -- no compile errors until you try to build a language with it
+  function parser(strs: TemplateStringsArray, ...xs: unknown[]) {
+    if (!compiled) {
+      compiled = compile(ast);
+    }
+    return parse(tokenize(strs.raw, xs, compiled.literals), compiled.parser);
+  }
+  parser.ast = ast;
+  parser.compile = () => {
+    compiled = compile(ast);
+  };
+
+  return parser;
+}
+
+export const rootLanguageLiterals = [
+  "{",
+  "}",
+  "(",
+  ")",
+  "[",
+  "]",
+  "#",
+  ":",
+  ";",
+  ",",
+  "+",
+  "|",
+  "=",
+  "++",
+  "**",
+  "*",
+  "?",
+  "include",
+  "value",
+  "identifier",
+  "operator",
+  "keyword",
+];
+
 export const lang = createLanguage(
-  new Seq(
-    (ast) => {
-      const { parser, literals } = compile(ast);
-      return createLanguage(parser, literals);
-    },
-    grammar,
-    new Zero(() => null)
-  ),
+  new Seq(createLanguage2, grammar, new Zero(() => null)),
   rootLanguageLiterals
 ) as ZebuLanguageReturning<ZebuLanguage>;

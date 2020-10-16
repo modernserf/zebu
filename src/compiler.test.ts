@@ -50,11 +50,13 @@ test("simple parsers", () => {
   const literal = compile({ type: "literal", value: "foo" });
   expect(parse([kw("foo")], literal)).toEqual("foo");
 
-  const included = compile({ type: "include", value: () => literal });
-  expect(parse([kw("foo")], included)).toEqual("foo");
-  expect(() => {
-    compile({ type: "include", value: () => ({} as any) });
-  }).toThrow();
+  // const included = compile({ type: "include", value: { type: "ruleset", value: "" }})
+
+  // const included = compile({ type: "include", value: () => literal });
+  // expect(parse([kw("foo")], included)).toEqual("foo");
+  // expect(() => {
+  //   compile({ type: "include", value: () => ({} as any) });
+  // }).toThrow();
 
   const parens = compile({
     type: "structure",
@@ -138,7 +140,7 @@ test("simple parsers", () => {
   expect(() => parse([kw("baz")], alt)).toThrow();
 });
 
-test("rulesets", () => {
+test.only("rulesets", () => {
   const rule1 = compile({
     type: "ruleset",
     rules: [{ name: "Main", expr: { type: "literal", value: "foo" } }],
@@ -160,16 +162,6 @@ test("rulesets", () => {
       rules: [
         { name: "Main", expr: { type: "identifier", value: "Unknown" } },
         { name: "Expr", expr: { type: "literal", value: "foo" } },
-      ],
-    });
-  }).toThrow();
-
-  expect(() => {
-    compile({
-      type: "ruleset",
-      rules: [
-        { name: "Main", expr: { type: "identifier", value: "Expr" } },
-        { name: "Expr", expr: { type: "identifier", value: "Main" } },
       ],
     });
   }).toThrow();

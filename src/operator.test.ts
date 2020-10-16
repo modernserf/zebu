@@ -25,23 +25,22 @@ test("operator", () => {
 
 test("operator invalid syntax", () => {
   expect(() => {
-    op`left "a>" : ${(l, r) => l + r}`;
+    op`left "a>" : ${(l, r) => l + r}`.compile();
   }).toThrow();
   expect(() => {
-    op`left ${1} : ${(l, r) => l + r}`;
+    op`left ${1} : ${(l, r) => l + r}`.compile();
   }).toThrow();
   expect(() => {
     op`
     left  "+"   : ${(l, r) => l + r}
           "+"   : ${(l, r) => l - r}
-  `;
+  `.compile();
   }).toThrow();
 });
 
-// TODO: new "include" format
 test.skip("operator parser include", () => {
   const expr = lang`
-    Expr = ${op`
+    Expr = include ${op`
       left "++" : ${(xs, ys) => xs.concat(ys)}
       root RootExpr
     `};
