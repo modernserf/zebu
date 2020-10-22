@@ -1,6 +1,3 @@
-import { partition } from "./util";
-
-export type StructureStartToken = "{" | "[" | "(";
 type TokenContent =
   | {
       type: "value";
@@ -103,19 +100,11 @@ const blockCommentPattern = /((?:\*[^/]|[^*])+)|(\*\/)/y;
 
 export const identifierOrOperator = /^(?:(?:\$|_|\p{ID_Start})(?:\$|\u200C|\u200D|\p{ID_Continue})*|[!@#%^&*\-+=|/:<>.?~]+|[,;])$/u;
 
-class Lexer {
+export class Lexer {
   lexerState: LexerState;
-  keywords: Set<string>;
   mainPattern: RegExp;
-  constructor(literals: string[]) {
-    const [keywords, operators] = partition(literals, (lit) => {
-      const match = lit.match(identifierPattern);
-      return !!match && match[0] === lit;
-    });
-    this.keywords = new Set(keywords);
-
-    const operatorsPattern = matchOperators(operators);
-    // console.log(operatorsPattern);
+  constructor(private readonly keywords: Set<string>, operators: Set<string>) {
+    const operatorsPattern = matchOperators(Array.from(operators));
 
     // each regex state is a set of capture groups
     this.mainPattern = new RegExp(
@@ -135,7 +124,7 @@ class Lexer {
       "uy"
     );
   }
-  run(strs: readonly string[], interps: unknown[]) {
+  run(strs: readonly string[], interps: unknown[]): Token[] {
     this.lexerState = new LexerState(strs, interps);
     this.mainState();
     return this.lexerState.getTokens();
@@ -246,14 +235,6 @@ class Lexer {
       this.lexerState.getInterpolation();
     }
   }
-}
-
-export function tokenize(
-  strs: readonly string[],
-  interps: unknown[],
-  literals: string[]
-): Token[] {
-  return new Lexer(literals).run(strs, interps);
 }
 
 function reEscape(s: string) {

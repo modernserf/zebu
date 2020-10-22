@@ -1,9 +1,9 @@
-import { AST } from "./ast";
+import { AST } from "./core";
 import {
   lang,
   ZebuLanguageReturning,
   ZebuLanguage,
-  createLanguage2,
+  createLanguage,
 } from "./lang";
 import { identifierOrOperator } from "./lexer";
 
@@ -14,7 +14,7 @@ export type Rule = { fixity: Fixity; operators: OpExpr[] };
 
 // prettier-ignore
 export const op = lang`
-  Program   = Rule* RootRule?    : ${(rules, root) =>  createLanguage2(buildAST(rules, root))};
+  Program   = Rule* RootRule?    : ${(rules, root) =>  createLanguage(buildAST(rules, root))};
   Rule      = Fixity Expr+       : 
     ${(fixity: string, operators: OpExpr[]): Rule => ({ fixity: fixity as Fixity, operators })};
   Expr      = Pattern ":" value  : 

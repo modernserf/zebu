@@ -1,30 +1,10 @@
-import { Token, tokenize } from "./lexer";
+import { Lexer, Token } from "./lexer";
 
-const defaultLiterals = [
-  "{",
-  "}",
-  "(",
-  ")",
-  "[",
-  "]",
-  "#",
-  ":",
-  ";",
-  ".",
-  ",",
-  "-",
-  "+",
-  "/",
-  "|",
-  "=",
-  "++",
-  "**",
-  "*",
-  "?",
-];
+const operators = new Set(["{", "}", "(", ")", ">", ";"]);
+const keywords = new Set(["if", "else"]);
 
 function tok(strs: TemplateStringsArray, ...interps: unknown[]) {
-  return tokenize(strs.raw, interps, defaultLiterals);
+  return new Lexer(keywords, operators).run(strs.raw, interps);
 }
 
 function strip(token: Token) {
@@ -35,17 +15,18 @@ function strip(token: Token) {
 }
 
 test("basic tokens", () => {
-  expect(tok`foo "bar" { -123.45 } + 0xDEADBEEF,; 'baz'`.map(strip)).toEqual([
+  expect(tok`if foo > 1 { bar('baz'); }`.map(strip)).toEqual([
+    { type: "keyword", value: "if" },
     { type: "identifier", value: "foo" },
-    { type: "value", value: "bar" },
+    { type: "operator", value: ">" },
+    { type: "value", value: 1 },
     { type: "operator", value: "{" },
-    { type: "value", value: -123.45 },
-    { type: "operator", value: "}" },
-    { type: "operator", value: "+" },
-    { type: "value", value: 0xdeadbeef },
-    { type: "operator", value: "," },
-    { type: "operator", value: ";" },
+    { type: "identifier", value: "bar" },
+    { type: "operator", value: "(" },
     { type: "value", value: "baz" },
+    { type: "operator", value: ")" },
+    { type: "operator", value: ";" },
+    { type: "operator", value: "}" },
   ]);
 
   expect(() => tok`"foo`).toThrow();
