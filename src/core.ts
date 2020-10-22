@@ -68,8 +68,8 @@ export function print(node: AST, indent = 0, prec = 0): string {
             : `\n${spaces(indent)}${rule.name} = ${print(rule.expr, indent)}`
         )
         .join("");
+    // istanbul ignore next
     default:
-      // istanbul ignore next
       assertUnreachable(node);
   }
 }
@@ -137,11 +137,11 @@ export const coreAST = ruleset(
     terminal('identifier'), lit('='), ident('AltExpr')
   )),
   rule('AltExpr', seq(
-    (exprs) => alt(...exprs),
+    (exprs) => exprs.length > 1 ? alt(...exprs): exprs[0],
     sepBy1(ident('SeqExpr'), lit('|')))
   ),
   rule('SeqExpr', seq(
-    (exprs, fn) => seq(fn, ...exprs),
+    (exprs, fn) => (fn || exprs.length > 1) ? seq(fn, ...exprs) : exprs[0],
     repeat1(ident('SepExpr')),
     maybe(seq((_, expr) => expr, lit(":"), terminal('value')))
   )),

@@ -91,6 +91,7 @@ class MatchRule<T> implements Parser<T> {
     try {
       return this.parsers.get(this.ruleName)!.parse(state);
     } catch (e) {
+      // istanbul ignore else
       if (e instanceof ParseError) {
         e._stack.push({ type: "rule", name: this.ruleName });
       }
@@ -261,6 +262,7 @@ export class ASTSimplifier {
           return recur;
         }
       }
+      // istanbul ignore next
       default:
         assertUnreachable(node);
     }
@@ -280,10 +282,9 @@ class ScopeManager {
     rules: Array<{ name: string; expr: AST }>,
     addRule: (name: symbol, expr: AST) => void
   ): SimpleAST {
+    // istanbul ignore next
     if (!rules.length) {
-      const nilRuleName = Symbol("nil");
-      addRule(nilRuleName, pushNull as AST);
-      return { type: "nonterminal", value: nilRuleName };
+      throw new Error("should be unreachable");
     }
     // build scope lookup
     const nextScope = new Map<string, symbol>();
@@ -401,6 +402,7 @@ class FirstSetBuilder {
         }
         return set;
       }
+      // istanbul ignore next
       default:
         assertUnreachable(node);
     }
@@ -433,6 +435,7 @@ export class ParserCompiler {
       case "nonterminal":
         return new MatchRule(this.compiledRules, node.value);
       case "repeat0":
+        this.firstSet.get(node);
         return new Repeat(
           this.compile(node.expr),
           new Set(this.firstSet.get(node.expr))
@@ -453,6 +456,7 @@ export class ParserCompiler {
         }
         return new Alt(parserMap);
       }
+      // istanbul ignore next
       default:
         assertUnreachable(node);
     }
