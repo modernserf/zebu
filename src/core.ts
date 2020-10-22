@@ -21,7 +21,7 @@ const wrapIf = (cond: boolean, str: string) => (cond ? `(${str})` : str);
 export function print(node: AST, indent = 0, prec = 0): string {
   switch (node.type) {
     case "error":
-      return `<error>`;
+      return `<error: ${node.message}>`;
     case "literal":
       return `"${node.value}"`;
     case "terminal":
@@ -69,6 +69,7 @@ export function print(node: AST, indent = 0, prec = 0): string {
         )
         .join("");
     default:
+      // istanbul ignore next
       assertUnreachable(node);
   }
 }

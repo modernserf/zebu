@@ -1,5 +1,4 @@
 import { lang } from "./lang";
-import { print } from "./core";
 
 test("nil language", () => {
   const nil = lang`Main = nil`;
@@ -63,4 +62,35 @@ test("if else", () => {
 test("interpolated parser", () => {
   const list = lang`Main = (include ${lang`Main = value`})+`;
   expect(list`1 2 3`).toEqual([1, 2, 3]);
+});
+
+test("keyword and operator terminals", () => {
+  const it = lang`
+    Statement = "print" Expr;
+    Expr      = DotExpr ("+" Expr)*;
+    DotExpr   = RootExpr ("." (identifier | keyword))*;
+    RootExpr  = #( operator )
+              | identifier
+              | value
+  `;
+  expect(() => {
+    it`print (+)`;
+    it`print foo.bar.print`;
+  }).not.toThrow();
+  expect(() => {
+    it`print print.foo`;
+  }).toThrow();
+});
+
+test("separators", () => {
+  const list1 = lang`Rule = identifier ++ ","`;
+  expect(list1`foo`).toEqual(["foo"]);
+  expect(list1`foo,`).toEqual(["foo"]);
+  expect(list1`foo, bar, baz`).toEqual(["foo", "bar", "baz"]);
+
+  const list0 = lang`Rule = (identifier ** ",")`;
+  expect(list0``).toEqual([]);
+  expect(list0`foo`).toEqual(["foo"]);
+  expect(list0`foo,`).toEqual(["foo"]);
+  expect(list0`foo, bar, baz`).toEqual(["foo", "bar", "baz"]);
 });

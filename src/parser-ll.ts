@@ -10,7 +10,11 @@ type RuleFrame = {
 type ParseErrorStackFrame = Token | RuleFrame;
 
 class ParseError {
-  public stack: ParseErrorStackFrame[] = [];
+  // NOTE: load-bearing underscore
+  // if an object with a property called `stack` is thrown in a Jest test
+  // it will hang indefinitely!
+  // see https://github.com/facebook/jest/issues/10681
+  public _stack: ParseErrorStackFrame[] = [];
   constructor(public readonly message: string) {}
 }
 
@@ -18,7 +22,7 @@ class MatchError extends ParseError {
   constructor(expected: string, received: Token | null) {
     super(`Expected ${expected}, received ${brandToken(received)}`);
     if (received) {
-      this.stack.push(received);
+      this._stack.push(received);
     }
   }
 }
@@ -88,7 +92,7 @@ class MatchRule<T> implements Parser<T> {
       return this.parsers.get(this.ruleName)!.parse(state);
     } catch (e) {
       if (e instanceof ParseError) {
-        e.stack.push({ type: "rule", name: this.ruleName });
+        e._stack.push({ type: "rule", name: this.ruleName });
       }
       throw e;
     }
@@ -130,7 +134,11 @@ class Repeat<T> implements Parser<T[]> {
   constructor(private parser: Parser<T>, private matchSet: Set<Terminal>) {}
   parse(state: ParseState) {
     const results: T[] = [];
-    while (this.matchSet.has(brandToken(state.peek()))) {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const next = state.peek();
+      if (!next || !this.matchSet.has(brandToken(next))) break;
+
       results.push(this.parser.parse(state));
     }
     return results;
@@ -220,33 +228,38 @@ export class ASTSimplifier {
           type: "alt",
           exprs: [this.simplify(node.expr), pushNull],
         };
-      // TODO: trailing separators is making this hang?
       case "sepBy0":
       case "sepBy1": {
+        const ruleName = Symbol();
+        const recur: SimpleAST = { type: "nonterminal", value: ruleName };
         const expr = this.simplify(node.expr);
         const sep = this.simplify(node.separator);
+        const orArr = (expr: SimpleAST): SimpleAST => ({
+          type: "alt",
+          exprs: [expr, pushArr],
+        });
 
-        const seq: SimpleAST = {
+        // Rule = Expr (Sep Rule?)?
+        const sepRule: SimpleAST = {
           type: "seq",
           fn: cons,
           exprs: [
             expr,
-            {
-              type: "repeat0",
-              expr: {
-                type: "seq",
-                fn: _2,
-                exprs: [sep, expr],
-              },
-            },
-            { type: "alt", exprs: [sep, pushNull] },
+            orArr({
+              type: "seq",
+              fn: _2,
+              exprs: [sep, orArr(recur)],
+            }),
           ],
         };
 
+        this.rules.set(ruleName, sepRule);
+
         if (node.type === "sepBy0") {
-          return { type: "alt", exprs: [seq, pushArr] };
+          return orArr(recur);
+        } else {
+          return recur;
         }
-        return seq;
       }
       default:
         assertUnreachable(node);
@@ -312,7 +325,7 @@ class LiteralManager {
       case "keyword":
         return { type: "nonterminal", value: this.keywordRule };
       case "operator":
-        return { type: "nonterminal", value: this.keywordRule };
+        return { type: "nonterminal", value: this.operatorRule };
       default:
         return { type: node.value };
     }
