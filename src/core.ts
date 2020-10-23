@@ -145,26 +145,30 @@ export const coreAST = ruleset(
     repeat1(ident('SepExpr')),
     maybe(seq((_, expr) => expr, lit(":"), terminal('value')))
   )),
-  rule('SepExpr', seq(
-    (expr, fn) => fn(expr),
+  rule('SepExpr', alt(
+    seq((expr, _, sep) => sepBy0(expr, sep), 
+      ident('RepExpr'), lit('**'), ident('RepExpr')),
+    seq((expr, _, sep) => sepBy1(expr, sep), 
+      ident('RepExpr'), lit('++'), ident('RepExpr')),
     ident('RepExpr'),
-    alt(
-      seq((_, sep) => (expr) => sepBy0(expr, sep), lit('**'), ident('RepExpr')),
-      seq((_, sep) => (expr) => sepBy1(expr, sep), lit('++'), ident('RepExpr')),
-      seq(() => (expr) => expr)
-    )
   )),
-  rule('RepExpr', seq((expr, tag) => wrapRep[tag](expr),
-      ident('Expr'), maybe(alt(lit('*'), lit('+'), lit('?'))),
+  rule('RepExpr', alt(
+    seq(repeat0, ident('Expr'), lit('*')),
+    seq(repeat1, ident('Expr'), lit('+')),
+    seq(maybe, ident('Expr'), lit('?')),
+    ident('Expr')
   )),
   rule('Expr', alt(
     structure('(', ident('AltExpr'), ')'),
-    seq((_, [first, expr, last]) => structure(first, expr, last),
-      lit('#'), alt(
-        seq((xs) => ['(', xs, ')'], structure('(', ident('AltExpr'), ')')),
-        seq((xs) => ['{', xs, '}'], structure('{', ident('AltExpr'), '}')),
-        seq((xs) => ['[', xs, ']'], structure('[', ident('AltExpr'), ']')),
-      )),
+    seq((_, expr) => structure('(', expr, ')'),
+      lit('#'), structure('(', ident('AltExpr'), ')')
+    ),
+    seq((_, expr) => structure('[', expr, ']'),
+      lit('#'), structure('[', ident('AltExpr'), ']')
+    ),
+    seq((_, expr) => structure('{', expr, '}'),
+      lit('#'), structure('{', ident('AltExpr'), '}')
+    ),
     seq(
       (_, lang) => lang && lang.ast || error('expected a language or AST here'), 
       lit('include'), terminal('value')),

@@ -12,6 +12,7 @@ import {
   Seq,
   ParseState,
 } from "./parser-combinators";
+import { resolveConflicts } from "./resolve-conflicts";
 import { assertUnreachable } from "./util";
 
 type Brand<K, T> = K & { __brand: T };
@@ -20,11 +21,11 @@ export const brandLiteral = (value: string) => `"${value}"` as Terminal;
 export const brandType = (type: string) => `<${type}>` as Terminal;
 export const brandEof = "(end of input)" as Terminal;
 
-type SimpleASTAlt = { type: "alt"; exprs: Array<SimpleASTSeq> };
-type SimpleASTSeq = { type: "seq"; exprs: SimpleASTNode[] };
+export type SimpleASTAlt = { type: "alt"; exprs: Array<SimpleASTSeq> };
+export type SimpleASTSeq = { type: "seq"; exprs: SimpleASTNode[] };
 
 type SeqFn = (...xs: unknown[]) => unknown;
-type SimpleASTNode =
+export type SimpleASTNode =
   | { type: "literal"; value: string }
   | { type: "identifier" }
   | { type: "value" }
@@ -37,8 +38,14 @@ export type SimpleAST = SimpleASTNode | SimpleASTSeq | SimpleASTAlt;
 
 const _2 = (_, x) => x;
 const cons = (h, t: unknown[]) => [h, ...t];
-const pushNull: SimpleASTNode = { type: "reduce", arity: 0, fn: () => null };
-const pushArr: SimpleASTNode = { type: "reduce", arity: 0, fn: () => [] };
+const pushNull: SimpleASTSeq = {
+  type: "seq",
+  exprs: [{ type: "reduce", arity: 0, fn: () => null }],
+};
+const pushArr: SimpleASTSeq = {
+  type: "seq",
+  exprs: [{ type: "reduce", arity: 0, fn: () => [] }],
+};
 
 export class ASTSimplifier {
   rules = new Map<symbol, SimpleASTAlt>();
@@ -50,6 +57,7 @@ export class ASTSimplifier {
   private simplifyAll(node: AST) {
     const startRule = Symbol("start");
     this.rules.set(startRule, this.simplifyAlt(node));
+    resolveConflicts(this.rules, startRule);
 
     const { keywords, operators } = this.literals.compile(this.rules);
     return {
@@ -69,10 +77,7 @@ export class ASTSimplifier {
       case "maybe":
         return {
           type: "alt",
-          exprs: [
-            this.simplifySeq(node.expr),
-            { type: "seq", exprs: [pushNull] },
-          ],
+          exprs: [this.simplifySeq(node.expr), pushNull],
         };
       case "sepBy0":
         return {
@@ -88,7 +93,7 @@ export class ASTSimplifier {
                 },
               ],
             },
-            { type: "seq", exprs: [pushArr] },
+            pushArr,
           ],
         };
       default:
@@ -309,11 +314,6 @@ class FirstSetBuilder {
         for (const expr of node.exprs) {
           for (const terminal of this.get(expr, recurSet)) {
             if (set.has(terminal)) {
-              console.log(
-                "first/first",
-                set,
-                ...node.exprs.map((node) => node.exprs)
-              );
               throw new Error(`first/first conflict on ${terminal}`);
             }
             set.add(terminal);

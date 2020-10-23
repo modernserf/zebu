@@ -1,3 +1,1 @@
 # notes
-
-- automatic left factoring

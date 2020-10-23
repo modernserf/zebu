@@ -6,10 +6,17 @@ Grammar = Rule ++ ";"
 Rule = identifier "=" AltExpr
 AltExpr = SeqExpr ++ "|"
 SeqExpr = SepExpr+ (":" value)?
-SepExpr = RepExpr ("**" RepExpr | "++" RepExpr | nil)
-RepExpr = Expr ("*" | "+" | "?")?
+SepExpr = RepExpr "**" RepExpr
+        | RepExpr "++" RepExpr
+        | RepExpr
+RepExpr = Expr "*"
+        | Expr "+"
+        | Expr "?"
+        | Expr
 Expr = #( AltExpr )
-     | "#" (#( AltExpr ) | #{ AltExpr } | #[ AltExpr ])
+     | "#" #( AltExpr )
+     | "#" #[ AltExpr ]
+     | "#" #{ AltExpr }
      | "include" value
      | identifier
      | "identifier"

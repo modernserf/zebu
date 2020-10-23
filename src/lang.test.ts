@@ -137,5 +137,7 @@ test("structures", () => {
 
 test("unresolvable conflicts", () => {
   expect(() => lang`Main = value? value`.compile()).toThrow();
-  expect(() => lang`Main = value | value`.compile()).toThrow();
+  expect(() =>
+    lang`Main = value  ${() => "x"}| value ${() => "y"}`.compile()
+  ).toThrow();
 });
