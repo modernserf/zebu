@@ -44,30 +44,44 @@ const brandToken = (token: Token | null) => {
 class ParseState {
   private index = 0;
   constructor(private readonly tokens: Token[]) {}
+  private results: unknown[] = [];
   next(): Token | null {
     return this.tokens[this.index++];
   }
   peek(): Token | null {
     return this.tokens[this.index] || null;
   }
+  push(x: unknown): void {
+    this.results.push(x);
+  }
+  reduce(arity: number, fn: (...xs: unknown[]) => unknown) {
+    const args: unknown[] = [];
+    for (let i = 0; i < arity; i++) {
+      args.unshift(this.results.pop());
+    }
+    this.results.push(fn(...args));
+  }
+  done(): unknown {
+    return this.results.pop();
+  }
 }
 
-export interface Parser<T> {
-  parse(state: ParseState): T;
+export interface Parser {
+  parse(state: ParseState): void;
 }
 
-class MatchType implements Parser<unknown> {
+class MatchType implements Parser {
   constructor(private type: "identifier" | "value") {}
   parse(state: ParseState) {
     const token = state.next();
     if (!token || token.type !== this.type) {
       throw new MatchError(brandType(this.type), token);
     }
-    return token.value;
+    state.push(token.value);
   }
 }
 
-class MatchLiteral implements Parser<string> {
+class MatchLiteral implements Parser {
   constructor(private value: string) {}
   parse(state: ParseState) {
     const token = state.next();
@@ -78,18 +92,15 @@ class MatchLiteral implements Parser<string> {
     ) {
       throw new MatchError(brandLiteral(this.value), token);
     }
-    return token.value;
+    state.push(token.value);
   }
 }
 
-class MatchRule<T> implements Parser<T> {
-  constructor(
-    private parsers: Map<symbol, Parser<T>>,
-    private ruleName: symbol
-  ) {}
+class MatchRule implements Parser {
+  constructor(private parsers: Map<symbol, Parser>, private ruleName: symbol) {}
   parse(state: ParseState) {
     try {
-      return this.parsers.get(this.ruleName)!.parse(state);
+      this.parsers.get(this.ruleName)!.parse(state);
     } catch (e) {
       // istanbul ignore else
       if (e instanceof ParseError) {
@@ -102,22 +113,24 @@ class MatchRule<T> implements Parser<T> {
 
 type SeqFn = (...xs: unknown[]) => unknown;
 
-class Seq<T> implements Parser<T> {
-  constructor(private fn: SeqFn | null, private parsers: Parser<T>[]) {}
+class Seq implements Parser {
+  constructor(private parsers: Parser[]) {}
   parse(state: ParseState) {
-    const results: T[] = [];
     for (const parser of this.parsers) {
-      results.push(parser.parse(state));
+      parser.parse(state);
     }
-    if (this.fn) {
-      return this.fn(...results) as T;
-    }
-    return results.pop()!;
   }
 }
 
-class Alt<T> implements Parser<T> {
-  constructor(private parserMap: Map<Terminal, Parser<T>>) {}
+class Reduce implements Parser {
+  constructor(private arity: number, private fn: SeqFn | null) {}
+  parse(state: ParseState) {
+    state.reduce(this.arity, this.fn || ((x) => x));
+  }
+}
+
+class Alt implements Parser {
+  constructor(private parserMap: Map<Terminal, Parser>) {}
   parse(state: ParseState) {
     const token = state.peek();
     let parser = this.parserMap.get(brandToken(token));
@@ -127,22 +140,22 @@ class Alt<T> implements Parser<T> {
     if (!parser) {
       throw new MatchError([...this.parserMap.keys()].join(), token);
     }
-    return parser.parse(state);
+    parser.parse(state);
   }
 }
 
-class Repeat<T> implements Parser<T[]> {
-  constructor(private parser: Parser<T>, private matchSet: Set<Terminal>) {}
+class Repeat implements Parser {
+  constructor(private parser: Parser, private matchSet: Set<Terminal>) {}
   parse(state: ParseState) {
-    const results: T[] = [];
+    state.push([]);
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const next = state.peek();
       if (!next || !this.matchSet.has(brandToken(next))) break;
 
-      results.push(this.parser.parse(state));
+      this.parser.parse(state);
+      state.reduce(2, (arr: unknown[], x) => [...arr, x]);
     }
-    return results;
   }
 }
 
@@ -152,13 +165,14 @@ export type SimpleAST =
   | { type: "value" }
   | { type: "nonterminal"; value: symbol }
   | { type: "repeat0"; expr: SimpleAST }
-  | { type: "seq"; exprs: SimpleAST[]; fn: SeqFn | null }
-  | { type: "alt"; exprs: SimpleAST[] };
+  | { type: "seq"; exprs: SimpleAST[] }
+  | { type: "alt"; exprs: SimpleAST[] }
+  | { type: "reduce"; arity: number; fn: SeqFn | null };
 
 const _2 = (_, x) => x;
 const cons = (h, t: unknown[]) => [h, ...t];
-const pushNull: SimpleAST = { type: "seq", exprs: [], fn: () => null };
-const pushArr: SimpleAST = { type: "seq", exprs: [], fn: () => [] };
+const pushNull: SimpleAST = { type: "reduce", arity: 0, fn: () => null };
+const pushArr: SimpleAST = { type: "reduce", arity: 0, fn: () => [] };
 
 export class ASTSimplifier {
   rules = new Map<symbol, SimpleAST>();
@@ -200,14 +214,17 @@ export class ASTSimplifier {
             this.literals.add(node.startToken),
             this.simplify(node.expr),
             this.literals.add(node.endToken),
+            { type: "reduce", arity: 3, fn: _2 },
           ],
-          fn: _2,
         };
       case "seq":
         return {
           type: "seq",
-          exprs: node.exprs.map((expr) => this.simplify(expr)),
-          fn: node.fn,
+          exprs: node.exprs
+            .map((expr) => this.simplify(expr))
+            .concat([
+              { type: "reduce", arity: node.exprs.length, fn: node.fn },
+            ]),
         };
       case "alt":
         return {
@@ -220,8 +237,11 @@ export class ASTSimplifier {
         const expr = this.simplify(node.expr);
         return {
           type: "seq",
-          exprs: [expr, { type: "repeat0", expr }],
-          fn: cons,
+          exprs: [
+            expr,
+            { type: "repeat0", expr },
+            { type: "reduce", arity: 2, fn: cons },
+          ],
         };
       }
       case "maybe":
@@ -243,14 +263,13 @@ export class ASTSimplifier {
         // Rule = Expr (Sep Rule?)?
         const sepRule: SimpleAST = {
           type: "seq",
-          fn: cons,
           exprs: [
             expr,
             orArr({
               type: "seq",
-              fn: _2,
-              exprs: [sep, orArr(recur)],
+              exprs: [sep, orArr(recur), { type: "reduce", arity: 2, fn: _2 }],
             }),
+            { type: "reduce", arity: 2, fn: cons },
           ],
         };
 
@@ -356,6 +375,8 @@ class FirstSetBuilder {
   }
   private getInner(node: SimpleAST, recurSet: Set<symbol>) {
     switch (node.type) {
+      case "reduce":
+        return new Set([brandEof]);
       case "literal":
         return new Set([brandLiteral(node.value)]);
       case "identifier":
@@ -410,22 +431,24 @@ class FirstSetBuilder {
 }
 
 export class ParserCompiler {
-  compiledRules = new Map<symbol, Parser<unknown>>();
+  compiledRules = new Map<symbol, Parser>();
   firstSet: FirstSetBuilder;
   constructor(ruleASTMap: Map<symbol, SimpleAST>) {
     this.firstSet = new FirstSetBuilder(ruleASTMap);
   }
   static compileRuleset(
     ruleASTMap: Map<symbol, SimpleAST>
-  ): Map<symbol, Parser<unknown>> {
+  ): Map<symbol, Parser> {
     const compiler = new ParserCompiler(ruleASTMap);
     for (const [name, node] of ruleASTMap) {
       compiler.compiledRules.set(name, compiler.compile(node));
     }
     return compiler.compiledRules;
   }
-  compile(node: SimpleAST): Parser<unknown> {
+  compile(node: SimpleAST): Parser {
     switch (node.type) {
+      case "reduce":
+        return new Reduce(node.arity, node.fn);
       case "literal":
         return new MatchLiteral(node.value);
       case "identifier":
@@ -442,13 +465,10 @@ export class ParserCompiler {
         );
       case "seq":
         this.firstSet.get(node);
-        return new Seq(
-          node.fn,
-          node.exprs.map((expr) => this.compile(expr))
-        );
+        return new Seq(node.exprs.map((expr) => this.compile(expr)));
       case "alt": {
         this.firstSet.get(node);
-        const parserMap = new Map<Terminal, Parser<unknown>>();
+        const parserMap = new Map<Terminal, Parser>();
         for (const expr of node.exprs) {
           for (const terminal of this.firstSet.get(expr)) {
             parserMap.set(terminal, this.compile(expr));
@@ -473,6 +493,8 @@ export function createParser(ast: AST) {
 
   return (strs: readonly string[], ...xs: unknown[]) => {
     const tokens = lexer.run(strs, xs);
-    return parser.parse(new ParseState(tokens));
+    const parseState = new ParseState(tokens);
+    parser.parse(parseState);
+    return parseState.done();
   };
 }
