@@ -38,7 +38,7 @@ test("operator invalid syntax", () => {
   }).toThrow();
 });
 
-test.skip("operator parser include", () => {
+test("operator parser include", () => {
   const expr = lang`
     Expr = include ${op`
       left "++" : ${(xs, ys) => xs.concat(ys)}

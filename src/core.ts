@@ -1,4 +1,4 @@
-import { Token } from "./lexer";
+import { identifierOrOperator, Token } from "./lexer";
 import { assertUnreachable } from "./util";
 
 export type AST =
@@ -74,6 +74,13 @@ export function print(node: AST, indent = 0, prec = 0): string {
   }
 }
 
+export function checkLit(x: string): AST {
+  if (typeof x !== "string" || !identifierOrOperator.test(x)) {
+    return { type: "error", message: "invalid pattern" };
+  }
+  return { type: "literal", value: x };
+}
+
 type SeqFn = (...xs: any[]) => unknown;
 
 const error = (message: string): AST => ({ type: "error", message });
@@ -120,13 +127,6 @@ export const builders = {
   alt, seq, repeat0, repeat1, maybe, sepBy0, sepBy1, structure,
   rule, ruleset,
 }
-
-const wrapRep = {
-  "+": (expr) => repeat1(expr),
-  "*": (expr) => repeat0(expr),
-  "?": (expr) => maybe(expr),
-  null: (expr) => expr,
-};
 
 // prettier-ignore
 export const coreAST = ruleset(
@@ -179,7 +179,7 @@ export const coreAST = ruleset(
     seq(() => terminal('value'), lit('value')),
     seq(() => seq(() => null), lit('nil')),
     seq(
-      (value) => lit(value),
+      checkLit,
       terminal('value')
     )
   ))

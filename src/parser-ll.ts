@@ -404,7 +404,7 @@ export class ParserCompiler {
   }
 }
 
-export function createParser(ast: AST) {
+export function createParser<T>(ast: AST) {
   const { startRule, rules, keywords, operators } = ASTSimplifier.simplifyAll(
     ast
   );
@@ -412,10 +412,10 @@ export function createParser(ast: AST) {
   const parserMap = ParserCompiler.compileRuleset(rules);
   const parser = parserMap.get(startRule)!;
 
-  return (strs: readonly string[], ...xs: unknown[]) => {
+  return (strs: readonly string[], ...xs: unknown[]): T => {
     const tokens = lexer.run(strs, xs);
     const parseState = new ParseState(tokens);
     parser.parse(parseState);
-    return parseState.done();
+    return parseState.done() as T;
   };
 }
