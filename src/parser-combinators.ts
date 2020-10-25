@@ -137,34 +137,3 @@ export class Alt implements Parser {
     parser.parse(state);
   }
 }
-
-export class SepBy1 implements Parser {
-  constructor(
-    private expr: Parser,
-    private exprSet: Set<Terminal>,
-    private sep: Parser,
-    private sepSet: Set<Terminal>
-  ) {}
-  parse(state: ParseState): void {
-    let didSucceed = false;
-
-    state.push([]);
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      let next = state.peek();
-      if (!next || !this.exprSet.has(brandToken(next))) break;
-      this.expr.parse(state);
-      state.reduce(2, (arr: unknown[], x) => [...arr, x]);
-      didSucceed = true;
-
-      next = state.peek();
-      if (!next || !this.sepSet.has(brandToken(next))) break;
-      this.sep.parse(state);
-      state.reduce(2, (x) => x);
-    }
-
-    if (!didSucceed) {
-      throw new MatchError([...this.exprSet].join(), state.peek());
-    }
-  }
-}

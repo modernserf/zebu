@@ -29,7 +29,6 @@ export type SimpleASTNode =
   | { type: "identifier" }
   | { type: "value" }
   | { type: "nonterminal"; value: symbol }
-  | { type: "sepBy1"; expr: SimpleASTNode; separator: SimpleASTNode }
   | { type: "reduce"; arity: number; fn: SeqFn | null };
 
 export type SimpleAST = SimpleASTNode | SimpleASTSeq | SimpleASTAlt;
@@ -84,11 +83,11 @@ export class ASTSimplifier {
             {
               type: "seq",
               exprs: [
-                {
+                this.simplifyNode({
                   type: "sepBy1",
-                  expr: this.simplifyNode(node.expr),
-                  separator: this.simplifyNode(node.separator),
-                },
+                  expr: node.expr,
+                  separator: node.separator,
+                }),
               ],
             },
             pushArr,
@@ -157,9 +156,9 @@ export class ASTSimplifier {
       case "identifier":
         return { type: "nonterminal", value: this.scope.lookup(node.value) };
       case "repeat0": {
-        const ruleName = Symbol();
-        const recur: SimpleASTNode = { type: "nonterminal", value: ruleName };
-        this.rules.set(ruleName, {
+        // A = Expr* ---> A = Expr A | nil
+        const recur: SimpleASTNode = { type: "nonterminal", value: Symbol() };
+        this.rules.set(recur.value, {
           type: "alt",
           exprs: [
             {
@@ -175,13 +174,44 @@ export class ASTSimplifier {
         });
         return recur;
       }
-      case "sepBy1":
-        return {
-          type: "sepBy1",
-          expr: this.simplifyNode(node.expr),
-          separator: this.simplifyNode(node.separator),
-        };
+      case "sepBy1": {
+        // A = Expr (Sep Expr)* Sep?
+        // --->
+        // A = Expr B
+        // B = Sep C | nil
+        // C = A | nil
+        const A: SimpleASTNode = { type: "nonterminal", value: Symbol() };
+        const B: SimpleASTNode = { type: "nonterminal", value: Symbol() };
+        const C: SimpleASTNode = { type: "nonterminal", value: Symbol() };
+        const expr = this.simplifyNode(node.expr);
+        const sep = this.simplifyNode(node.separator);
 
+        this.rules.set(A.value, {
+          type: "alt",
+          exprs: [
+            {
+              type: "seq",
+              exprs: [expr, B, { type: "reduce", arity: 2, fn: cons }],
+            },
+          ],
+        });
+        this.rules.set(B.value, {
+          type: "alt",
+          exprs: [
+            {
+              type: "seq",
+              exprs: [sep, C, { type: "reduce", arity: 2, fn: _2 }],
+            },
+            pushArr,
+          ],
+        });
+        this.rules.set(C.value, {
+          type: "alt",
+          exprs: [{ type: "seq", exprs: [A] }, pushArr],
+        });
+
+        return A;
+      }
       // istanbul ignore next
       default:
         assertUnreachable(node);
@@ -294,13 +324,6 @@ class FirstSetBuilder {
         const next = this.rules.get(node.value)!;
         return this.get(next, new Set([...recurSet, node.value]));
       }
-      case "sepBy1": {
-        const exprSet = this.get(node.expr, recurSet);
-        if (exprSet.has(brandEof)) {
-          throw new Error(`sepBy expr cannot match epsilon`);
-        }
-        return exprSet;
-      }
       case "seq": {
         const set = new Set([brandEof]);
         for (const expr of node.exprs) {
@@ -361,14 +384,6 @@ export class ParserCompiler {
         return new MatchType("value");
       case "nonterminal":
         return new MatchRule(this.compiledRules, node.value);
-      case "sepBy1":
-        this.firstSet.get(node);
-        return new SepBy1(
-          this.compile(node.expr),
-          this.firstSet.get(node.expr),
-          this.compile(node.separator),
-          this.firstSet.get(node.separator)
-        );
       case "seq":
         this.firstSet.get(node);
         return new Seq(node.exprs.map((expr) => this.compile(expr)));

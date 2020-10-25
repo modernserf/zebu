@@ -138,8 +138,6 @@ function isEqual(l: SimpleASTNode | null, rIn: SimpleASTNode | null) {
       return l.value === r.value;
     case "reduce":
       return l.arity === r.arity && l.fn === r.fn;
-    case "sepBy1":
-      return isEqual(l.expr, r.expr) && isEqual(l.separator, r.separator);
     // istanbul ignore next
     default:
       assertUnreachable(l);
@@ -192,11 +190,6 @@ export function inlineRules(
 
 function canInline(node: SimpleASTNode, rulesToKeep: Set<symbol>) {
   if (node.type === "nonterminal") return rulesToKeep.has(node.value);
-  if (node.type === "sepBy1")
-    return (
-      canInline(node.expr, rulesToKeep) &&
-      canInline(node.separator, rulesToKeep)
-    );
   return true;
 }
 
