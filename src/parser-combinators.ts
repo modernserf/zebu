@@ -138,21 +138,6 @@ export class Alt implements Parser {
   }
 }
 
-export class Repeat implements Parser {
-  constructor(private parser: Parser, private matchSet: Set<Terminal>) {}
-  parse(state: ParseState): void {
-    state.push([]);
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const next = state.peek();
-      if (!next || !this.matchSet.has(brandToken(next))) break;
-
-      this.parser.parse(state);
-      state.reduce(2, (arr: unknown[], x) => [...arr, x]);
-    }
-  }
-}
-
 export class SepBy1 implements Parser {
   constructor(
     private expr: Parser,

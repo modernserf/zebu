@@ -7,7 +7,6 @@ import {
   MatchType,
   Parser,
   Reduce,
-  Repeat,
   SepBy1,
   Seq,
   ParseState,
@@ -30,7 +29,6 @@ export type SimpleASTNode =
   | { type: "identifier" }
   | { type: "value" }
   | { type: "nonterminal"; value: symbol }
-  | { type: "repeat0"; expr: SimpleASTNode }
   | { type: "sepBy1"; expr: SimpleASTNode; separator: SimpleASTNode }
   | { type: "reduce"; arity: number; fn: SeqFn | null };
 
@@ -121,17 +119,15 @@ export class ASTSimplifier {
               { type: "reduce", arity: node.exprs.length, fn: node.fn },
             ]),
         };
-      case "repeat1": {
-        const expr = this.simplifyNode(node.expr);
+      case "repeat1":
         return {
           type: "seq",
           exprs: [
-            expr,
-            { type: "repeat0", expr },
+            this.simplifyNode(node.expr),
+            this.simplifyNode({ type: "repeat0", expr: node.expr }),
             { type: "reduce", arity: 2, fn: cons },
           ],
         };
-      }
       default:
         return { type: "seq", exprs: [this.simplifyNode(node)] };
     }
@@ -160,8 +156,25 @@ export class ASTSimplifier {
         return this.literals.terminal(node);
       case "identifier":
         return { type: "nonterminal", value: this.scope.lookup(node.value) };
-      case "repeat0":
-        return { type: "repeat0", expr: this.simplifyNode(node.expr) };
+      case "repeat0": {
+        const ruleName = Symbol();
+        const recur: SimpleASTNode = { type: "nonterminal", value: ruleName };
+        this.rules.set(ruleName, {
+          type: "alt",
+          exprs: [
+            {
+              type: "seq",
+              exprs: [
+                this.simplifyNode(node.expr),
+                recur,
+                { type: "reduce", arity: 2, fn: cons },
+              ],
+            },
+            pushArr,
+          ],
+        });
+        return recur;
+      }
       case "sepBy1":
         return {
           type: "sepBy1",
@@ -281,13 +294,6 @@ class FirstSetBuilder {
         const next = this.rules.get(node.value)!;
         return this.get(next, new Set([...recurSet, node.value]));
       }
-      case "repeat0": {
-        const innerSet = this.get(node.expr, recurSet);
-        if (innerSet.has(brandEof)) {
-          throw new Error(`repeat0 cannot match epsilon`);
-        }
-        return new Set([...innerSet, brandEof]);
-      }
       case "sepBy1": {
         const exprSet = this.get(node.expr, recurSet);
         if (exprSet.has(brandEof)) {
@@ -355,12 +361,6 @@ export class ParserCompiler {
         return new MatchType("value");
       case "nonterminal":
         return new MatchRule(this.compiledRules, node.value);
-      case "repeat0":
-        this.firstSet.get(node);
-        return new Repeat(
-          this.compile(node.expr),
-          new Set(this.firstSet.get(node.expr))
-        );
       case "sepBy1":
         this.firstSet.get(node);
         return new SepBy1(

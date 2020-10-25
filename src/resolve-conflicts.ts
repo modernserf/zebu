@@ -138,8 +138,6 @@ function isEqual(l: SimpleASTNode | null, rIn: SimpleASTNode | null) {
       return l.value === r.value;
     case "reduce":
       return l.arity === r.arity && l.fn === r.fn;
-    case "repeat0":
-      return isEqual(l.expr, r.expr);
     case "sepBy1":
       return isEqual(l.expr, r.expr) && isEqual(l.separator, r.separator);
     // istanbul ignore next
@@ -199,7 +197,6 @@ function canInline(node: SimpleASTNode, rulesToKeep: Set<symbol>) {
       canInline(node.expr, rulesToKeep) &&
       canInline(node.separator, rulesToKeep)
     );
-  if (node.type === "repeat0") return canInline(node.expr, rulesToKeep);
   return true;
 }
 
