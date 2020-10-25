@@ -1,4 +1,4 @@
-import { AST, checkLit } from "./core";
+import { AST, checkLit, builders } from "./core";
 import {
   lang,
   ZebuLanguageReturning,
@@ -6,6 +6,7 @@ import {
   createLanguage,
 } from "./lang";
 import { assertUnreachable } from "./util";
+const { alt, seq, ident } = builders;
 
 type Fixity = "left" | "right" | "pre" | "post";
 type SeqFn = (...xs: unknown[]) => unknown;
@@ -27,74 +28,33 @@ export const op = lang`
 
 export function buildAST(rules: Rule[], rootExpr: string): AST {
   const ruleset: AST = { type: "ruleset", rules: [] };
-  let next: AST = { type: "identifier", value: "0" };
+  let next = ident("0");
   for (const [i, rule] of rules.entries()) {
-    const push = (expr: AST) => ruleset.rules.push({ name: String(i), expr });
-    const self: AST = { type: "identifier", value: String(i) };
-    next = { type: "identifier", value: String(i + 1) };
-    const opAlts: AST = {
-      type: "alt",
-      exprs: rule.operators.map(({ pattern, fn }) => ({
-        type: "seq",
-        exprs: pattern.map(checkLit),
-        fn: () => fn,
-      })),
-    };
+    const self = ident(String(i));
+    next = ident(String(i + 1));
+    const push = (fn: any, ...exprs: AST[]) =>
+      ruleset.rules.push({
+        name: String(i),
+        expr: alt(seq(fn, ...exprs), next),
+      });
+    const opAlts = alt(
+      ...rule.operators.map(({ pattern, fn }) =>
+        seq(() => fn, ...pattern.map(checkLit))
+      )
+    );
 
     switch (rule.fixity) {
-      case "left": {
-        push({
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [self, opAlts, next],
-              fn: (l, op, r) => op(l, r),
-            },
-            next,
-          ],
-        });
+      case "left":
+        push((l, op, r) => op(l, r), self, opAlts, next);
         break;
-      }
-      case "right": {
-        push({
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [next, opAlts, self],
-              fn: (l, op, r) => op(l, r),
-            },
-            next,
-          ],
-        });
+      case "right":
+        push((l, op, r) => op(l, r), next, opAlts, self);
         break;
-      }
       case "pre":
-        push({
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [opAlts, self],
-              fn: (op, r) => op(r),
-            },
-            next,
-          ],
-        });
+        push((op, r) => op(r), opAlts, self);
         break;
       case "post":
-        push({
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [self, opAlts],
-              fn: (l, op) => op(l),
-            },
-            next,
-          ],
-        });
+        push((l, op) => op(l), self, opAlts);
         break;
       // istanbul ignore next
       default:
@@ -103,26 +63,12 @@ export function buildAST(rules: Rule[], rootExpr: string): AST {
   }
 
   const rootASTNode: AST = rootExpr
-    ? {
-        type: "identifier",
-        value: rootExpr,
-      }
-    : { type: "terminal", value: "value" };
+    ? ident(rootExpr)
+    : builders.terminal("value");
 
   ruleset.rules.push({
-    name: next.value,
-    expr: {
-      type: "alt",
-      exprs: [
-        {
-          type: "structure",
-          startToken: "(",
-          endToken: ")",
-          expr: { type: "identifier", value: "0" },
-        },
-        rootASTNode,
-      ],
-    },
+    name: (next as AST & { type: "terminal" }).value,
+    expr: alt(builders.structure("(", ident("0"), ")"), rootASTNode),
   });
 
   return ruleset;

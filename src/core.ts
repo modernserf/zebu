@@ -170,7 +170,7 @@ export const coreAST = ruleset(
       lit('#'), structure('{', ident('AltExpr'), '}')
     ),
     seq(
-      (_, lang) => lang && lang.ast || error('expected a language or AST here'), 
+      (_, lang) => lang && lang.ast || error('expected a language or AST'), 
       lit('include'), terminal('value')),
     seq(ident, terminal('identifier')),
     seq(() => terminal('identifier'), lit('identifier')),
