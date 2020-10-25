@@ -1,12 +1,54 @@
 import { SimpleASTAlt, SimpleASTNode, SimpleASTSeq } from "./parser-ll";
-import { assertUnreachable } from "./util";
+import { assertUnreachable, partition } from "./util";
 
 export function resolveConflicts(
   rules: Map<symbol, SimpleASTAlt>,
   firstRule: symbol
 ): void {
   // inlineRules(rules, firstRule);
+  fixLeftRecursion(rules);
   factorLeft(rules);
+}
+
+// A = A + B | B
+//     -->
+// A  = B A'
+// A' = + B A' | nil
+export function fixLeftRecursion(rules: Map<symbol, SimpleASTAlt>): void {
+  for (const [ruleName, rule] of rules) {
+    const [leftRecursiveBranches, safeBranches] = partition(
+      rule.exprs,
+      (expr) => {
+        const node = expr.exprs[0];
+        return node && node.type === "nonterminal" && node.value === ruleName;
+      }
+    );
+    if (leftRecursiveBranches.length > 0) {
+      const newRule = Symbol();
+      // make a self-recursive rule here (instead of using * repeater)
+      // so that you don't have to transform the reduce fns
+      rules.set(newRule, {
+        type: "alt",
+        exprs: leftRecursiveBranches
+          .map(
+            (seq): SimpleASTSeq => ({
+              type: "seq",
+              exprs: seq.exprs
+                .slice(1)
+                .concat([{ type: "nonterminal", value: newRule }]),
+            })
+          )
+          .concat({ type: "seq", exprs: [] }),
+      });
+      rules.set(ruleName, {
+        type: "alt",
+        exprs: safeBranches.map((seq) => ({
+          type: "seq",
+          exprs: seq.exprs.concat([{ type: "nonterminal", value: newRule }]),
+        })),
+      });
+    }
+  }
 }
 
 // a X | a Y -> a (X | Y)
@@ -110,20 +152,23 @@ export function inlineRules(
   rules: Map<symbol, SimpleASTAlt>,
   firstRuleName: symbol
 ): void {
+  const rulesToKeep = new Set([firstRuleName]);
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const rulesToInline = new Set<symbol>();
-
+    const rulesToInline: symbol[] = [];
     for (const [ruleName, rule] of rules) {
-      if (ruleName === firstRuleName) continue;
-      for (const seq of rule.exprs) {
-        if (seq.exprs.every(canInline)) {
-          rulesToInline.add(ruleName);
-        }
+      if (
+        !rulesToKeep.has(ruleName) &&
+        rule.exprs.every((seq) =>
+          seq.exprs.every((node) => canInline(node, rulesToKeep))
+        )
+      ) {
+        rulesToInline.push(ruleName);
+        rulesToKeep.add(ruleName);
       }
     }
 
-    if (rulesToInline.size === 0) return;
+    if (rulesToInline.length === 0) return;
 
     for (const ruleToInlineName of rulesToInline) {
       for (const [ruleName, targetRule] of rules) {
@@ -144,18 +189,17 @@ export function inlineRules(
         rules.set(ruleName, result);
       }
     }
-
-    for (const ruleName of rulesToInline) {
-      rules.delete(ruleName);
-    }
   }
 }
 
-function canInline(node: SimpleASTNode) {
-  if (node.type === "nonterminal") return false;
+function canInline(node: SimpleASTNode, rulesToKeep: Set<symbol>) {
+  if (node.type === "nonterminal") return rulesToKeep.has(node.value);
   if (node.type === "sepBy1")
-    return canInline(node.expr) && canInline(node.separator);
-  if (node.type === "repeat0") return canInline(node.expr);
+    return (
+      canInline(node.expr, rulesToKeep) &&
+      canInline(node.separator, rulesToKeep)
+    );
+  if (node.type === "repeat0") return canInline(node.expr, rulesToKeep);
   return true;
 }
 

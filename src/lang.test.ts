@@ -32,15 +32,17 @@ test("undefined rules", () => {
 
 test("self-recursion", () => {
   const right = lang`
-    Term = Expr ("+" Term)?;
+    Term = Expr "**" Term : ${(l, _, r) => l ** r}
+         | Expr;
     Expr = value;
   `;
-  expect(() => right.compile()).not.toThrow();
+  expect(right`2 ** 3 ** 4`).toEqual(2 ** (3 ** 4));
   const left = lang`
-    Term = Term ("-" Expr)?;
+    Term = Term "-" Expr: ${(l, _, r) => l - r}
+         | Expr;
     Expr = value;
   `;
-  expect(() => left.compile()).toThrow();
+  expect(left`2 - 3 - 4`).toEqual(2 - 3 - 4);
 });
 
 test("repeaters", () => {

@@ -148,7 +148,6 @@ export class Lexer {
 
         const lastIndex = lexerState.index;
         const match = lexerState.matchPattern(this.mainPattern);
-        // TODO: i'm not actually sure if this error is possible
         /* istanbul ignore next */
         if (!match) {
           throw new NoTokenMatchError(lexerState.index, lexerState.outerIndex);

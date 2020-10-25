@@ -1,5 +1,5 @@
 import { SimpleASTAlt, SimpleASTNode, SimpleASTSeq } from "./parser-ll";
-import { factorLeft, inlineRules } from "./resolve-conflicts";
+import { factorLeft, fixLeftRecursion, inlineRules } from "./resolve-conflicts";
 
 const alt = (...exprs: SimpleASTSeq[]): SimpleASTAlt => ({
   type: "alt",
@@ -23,7 +23,11 @@ test("inlineRules", () => {
   ]);
   inlineRules(rules, root);
   expect(rules).toEqual(
-    new Map([[root, alt(seq(lit("x"), lit("a")), seq(lit("b"), lit("y")))]])
+    new Map([
+      [root, alt(seq(lit("x"), lit("a")), seq(lit("b"), lit("y")))],
+      [A, alt(seq(lit("a")))],
+      [B, alt(seq(lit("b")))],
+    ])
   );
 });
 
@@ -50,4 +54,53 @@ test("factorLeft", () => {
       [next, alt(seq(lit("a")), seq(lit("b")), seq())],
     ])
   );
+});
+
+test("fixLeftRecursion", () => {
+  const Expr = Symbol("Expr");
+  const Factor = Symbol("Factor");
+  const Term = Symbol("Term");
+  // prettier-ignore
+  const rules = new Map([
+    [Expr, alt(
+      seq(nt(Expr), lit('+'), nt(Factor)),
+      seq(nt(Expr), lit('-'), nt(Factor)),
+      seq(nt(Factor))
+    )],
+    [Factor, alt(
+      seq(nt(Factor), lit('*'), nt(Term)),
+      seq(nt(Factor), lit('/'), nt(Term)),
+      seq(nt(Term))
+    )],
+    [Term, alt(
+      seq(lit('('), nt(Expr), lit(')')),
+      seq({ type: "value" })
+    )]
+  ]);
+  fixLeftRecursion(rules);
+  const ExprNext = (rules.get(Expr)!.exprs[0].exprs[1] as SimpleASTNode & {
+    type: "nonterminal";
+  }).value;
+  const FactorNext = (rules.get(Factor)!.exprs[0].exprs[1] as SimpleASTNode & {
+    type: "nonterminal";
+  }).value;
+  // prettier-ignore
+  expect(rules).toEqual(new Map([
+    [Expr, alt(seq(nt(Factor), nt(ExprNext)))],
+    [ExprNext, alt(
+      seq(lit('+'), nt(Factor), nt(ExprNext)),
+      seq(lit('-'), nt(Factor), nt(ExprNext)),
+      seq()
+    )],
+    [Factor, alt(seq(nt(Term), nt(FactorNext)))],
+    [FactorNext, alt(
+      seq(lit('*'), nt(Term), nt(FactorNext)),
+      seq(lit('/'), nt(Term), nt(FactorNext)),
+      seq()
+    )],
+    [Term, alt(
+      seq(lit('('), nt(Expr), lit(')')),
+      seq({ type: "value" })
+    )]
+  ]))
 });
