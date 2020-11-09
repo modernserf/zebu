@@ -1,4 +1,5 @@
 import { lang } from "./lang";
+import { ParseError, CompileError } from "./util";
 
 test("nil language", () => {
   const nil = lang`Main = nil`;
@@ -6,11 +7,13 @@ test("nil language", () => {
 });
 
 test("simple values", () => {
-  const num = lang`Main = "return" value : ${(_, x) => x}`;
+  const num = lang`Main = "return" value : ${(_, x) => x};`;
   expect(num`return 123`).toEqual(123);
-  expect(() => num`return`).toThrow();
-  expect(() => num`return foo`).toThrow();
-  expect(() => num`"return" 123`).toThrow();
+  expect(() => num`yield 123`).toThrow(ParseError);
+  expect(() => num`return`).toThrow(ParseError);
+  expect(() => num`return foo`).toThrow(ParseError);
+  expect(() => num`"return" 123`).toThrow(ParseError);
+  expect(() => num`return 123 456`).toThrow(ParseError);
 });
 
 test("recursive rules", () => {
@@ -27,7 +30,7 @@ test("recursive rules", () => {
 });
 
 test("undefined rules", () => {
-  expect(() => lang`Rule = Expr`.compile()).toThrow();
+  expect(() => lang`Rule = Expr`.compile()).toThrow(CompileError);
 });
 
 test("self-recursion", () => {
@@ -67,9 +70,9 @@ test("repeaters", () => {
     ["baz", "quux"],
     "xyzzy",
   ]);
-  expect(() => nonEmptyList`()`).toThrow();
+  expect(() => nonEmptyList`()`).toThrow(ParseError);
 
-  expect(() => lang`Main = (value?)*`.compile()).toThrow();
+  expect(() => lang`Main = (value?)*`.compile()).toThrow(CompileError);
 });
 
 test("if else", () => {
@@ -87,7 +90,7 @@ test("interpolated parser", () => {
   const list = lang`Main = (include ${lang`Main = value`})+`;
   expect(list`1 2 3`).toEqual([1, 2, 3]);
 
-  expect(() => lang`Main = include ${null}`.compile()).toThrow();
+  expect(() => lang`Main = include ${null}`.compile()).toThrow(CompileError);
 });
 
 test("keyword and operator terminals", () => {
@@ -105,7 +108,7 @@ test("keyword and operator terminals", () => {
   }).not.toThrow();
   expect(() => {
     it`print print.foo`;
-  }).toThrow();
+  }).toThrow(ParseError);
 });
 
 test("separators", () => {
@@ -138,8 +141,10 @@ test("structures", () => {
 });
 
 test("unresolvable conflicts", () => {
-  expect(() => lang`Main = value? value`.compile()).toThrow();
+  expect(() => lang`Main = value? value`.compile()).toThrow(CompileError);
   expect(() =>
-    lang`Main = value  ${() => "x"}| value ${() => "y"}`.compile()
-  ).toThrow();
+    lang`Main = value ${() => "x"} 
+              | value ${() => "y"};
+        `.compile()
+  ).toThrow(CompileError);
 });

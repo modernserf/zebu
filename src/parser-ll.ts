@@ -9,9 +9,10 @@ import {
   Reduce,
   Seq,
   ParseState,
+  InternalParseError,
 } from "./parser-combinators";
 import { resolveConflicts } from "./resolve-conflicts";
-import { assertUnreachable } from "./util";
+import { assertUnreachable, ParseError, CompileError } from "./util";
 
 type Brand<K, T> = K & { __brand: T };
 export type Terminal = Brand<string, "Terminal">;
@@ -133,7 +134,7 @@ export class ASTSimplifier {
   private simplifyNode(node: AST): SimpleASTNode {
     switch (node.type) {
       case "error":
-        throw new Error(node.message);
+        throw new CompileError(node.message);
       case "repeat1":
       case "structure":
       case "seq":
@@ -225,7 +226,7 @@ class ScopeManager {
       const scope = this.stack[i];
       if (scope.has(value)) return scope.get(value)!;
     }
-    throw new Error(`unknown identifier ${value}`);
+    throw new CompileError(`unknown identifier ${value}`);
   }
   public compileRuleset(
     rules: Array<{ name: string; expr: AST }>,
@@ -233,7 +234,7 @@ class ScopeManager {
   ): SimpleASTNode {
     // istanbul ignore next
     if (!rules.length) {
-      throw new Error("should be unreachable");
+      throw new CompileError("should be unreachable");
     }
     // build scope lookup
     const nextScope = new Map<string, symbol>();
@@ -318,7 +319,7 @@ class FirstSetBuilder {
         return new Set([brandType("value")]);
       case "nonterminal": {
         if (recurSet.has(node.value)) {
-          throw new Error(`left recursion on ${node.value.description}`);
+          throw new CompileError(`left recursion on ${node.value.description}`);
         }
         const next = this.rules.get(node.value)!;
         return this.get(next, new Set([...recurSet, node.value]));
@@ -329,7 +330,7 @@ class FirstSetBuilder {
           set.delete(brandEof);
           for (const terminal of this.get(expr, recurSet)) {
             if (set.has(terminal)) {
-              throw new Error(`first/follow conflict on ${terminal}`);
+              throw new CompileError(`first/follow conflict on ${terminal}`);
             }
             set.add(terminal);
           }
@@ -342,7 +343,7 @@ class FirstSetBuilder {
         for (const expr of node.exprs) {
           for (const terminal of this.get(expr, recurSet)) {
             if (set.has(terminal)) {
-              throw new Error(`first/first conflict on ${terminal}`);
+              throw new CompileError(`first/first conflict on ${terminal}`);
             }
             set.add(terminal);
           }
@@ -387,6 +388,8 @@ export class ParserCompiler {
         this.firstSet.get(node);
         return new Seq(node.exprs.map((expr) => this.compile(expr)));
       case "alt": {
+        if (node.exprs.length === 1) return this.compile(node.exprs[0]);
+
         this.firstSet.get(node);
         const parserMap = new Map<Terminal, Parser>();
         for (const expr of node.exprs) {
@@ -414,7 +417,16 @@ export function createParser<T>(ast: AST) {
   return (strs: readonly string[], ...xs: unknown[]): T => {
     const tokens = lexer.run(strs, xs);
     const parseState = new ParseState(tokens);
-    parser.parse(parseState);
-    return parseState.done() as T;
+    try {
+      parser.parse(parseState);
+      return parseState.done() as T;
+    } catch (e) {
+      // istanbul ignore else
+      if (e instanceof InternalParseError) {
+        throw new ParseError(e.message, strs, e.pos);
+      } else {
+        throw e;
+      }
+    }
   };
 }

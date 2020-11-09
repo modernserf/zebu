@@ -3,7 +3,7 @@ import { assertUnreachable, partition } from "./util";
 
 export function resolveConflicts(
   rules: Map<symbol, SimpleASTAlt>,
-  firstRule: symbol
+  _firstRule: symbol
 ): void {
   // inlineRules(rules, firstRule);
   fixLeftRecursion(rules);
@@ -123,6 +123,8 @@ function groupByPrefix(
   return null;
 }
 
+// TODO: coverage?
+// istanbul ignore next
 function isEqual(l: SimpleASTNode | null, rIn: SimpleASTNode | null) {
   if (l === rIn) return true;
   if (!l || !rIn) return false;
@@ -188,6 +190,8 @@ export function inlineRules(
   }
 }
 
+// TODO: coverage
+// istanbul ignore next
 function canInline(node: SimpleASTNode, rulesToKeep: Set<symbol>) {
   if (node.type === "nonterminal") return rulesToKeep.has(node.value);
   return true;

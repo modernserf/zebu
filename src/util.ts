@@ -50,7 +50,7 @@ function scan(
     }
     state.outerIndex += direction;
     if (direction < 0) {
-      state.index = strs[state.outerIndex].length - 1;
+      state.index = (strs[state.outerIndex] || "").length - 1;
     } else {
       state.index = 0;
     }
@@ -119,8 +119,12 @@ export function showInContext(
   return lines.filter((line) => line.trimEnd().length > 0).join("\n");
 }
 
-export class ZebuError extends Error {
+export class ParseError extends Error {
   constructor(message: string, strs: readonly string[], pos: TokenPosition) {
     super(`${message}\n${showInContext(strs, pos)}`);
   }
 }
+
+// TODO: add token position & show in context
+// will probably need to include source tokens in AST nodes
+export class CompileError extends Error {}

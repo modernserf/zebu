@@ -26,8 +26,18 @@ Expr = #( AltExpr )
      | "nil"
      | value`);
 
-  const { error, repeat0, sepBy0, lit } = builders;
+  const { error, repeat0, sepBy0, lit, seq, alt } = builders;
 
   const grammarWithOtherTokens = repeat0(sepBy0(error("message"), lit("foo")));
   expect(print(grammarWithOtherTokens)).toEqual(`(<error: message> ** "foo")*`);
+
+  const grammarWithInnerAlt = seq(
+    () => null,
+    alt(lit("foo"), lit("bar")),
+    lit("baz")
+  );
+  expect(print(grammarWithInnerAlt)).toEqual(`("foo" | "bar") "baz"`);
+
+  const grammarWithEmptySeq = seq(() => null);
+  expect(print(grammarWithEmptySeq)).toEqual(`nil`);
 });

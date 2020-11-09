@@ -1,4 +1,4 @@
-import { TokenPosition, ZebuError } from "./util";
+import { TokenPosition, ParseError } from "./util";
 
 type TokenContent =
   | {
@@ -124,7 +124,7 @@ export class Lexer {
     } catch (e) {
       // istanbul ignore else
       if (e instanceof LexerError) {
-        throw new ZebuError(e.message, strs, e.pos);
+        throw new ParseError(e.message, strs, e.pos);
       } else {
         throw e;
       }

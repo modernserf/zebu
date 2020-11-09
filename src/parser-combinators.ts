@@ -1,13 +1,16 @@
 import { Token } from "./lexer";
 import { brandEof, brandLiteral, brandType, Terminal } from "./parser-ll";
+import { TokenPosition } from "./util";
 
-type RuleFrame = {
-  type: "rule";
-  name: symbol;
+type EofToken = {
+  type: "eof";
+  index: number;
+  outerIndex: number;
+  length: number;
 };
 
-const brandToken = (token: Token | null) => {
-  if (!token) return brandEof;
+const brandToken = (token: Token | EofToken) => {
+  if (token.type === "eof") return brandEof;
   if (token.type === "identifier" || token.type === "value") {
     return brandType(token.type);
   } else {
@@ -15,23 +18,22 @@ const brandToken = (token: Token | null) => {
   }
 };
 
-type ParseErrorStackFrame = Token | RuleFrame;
-
-class ParseError {
-  // NOTE: load-bearing underscore
-  // if an object with a property called `stack` is thrown in a Jest test
-  // it will hang indefinitely!
-  // see https://github.com/facebook/jest/issues/10681
-  public _stack: ParseErrorStackFrame[] = [];
-  constructor(public readonly message: string) {}
+export class InternalParseError {
+  constructor(
+    public readonly message: string,
+    public readonly pos: TokenPosition
+  ) {}
 }
 
-class MatchError extends ParseError {
-  constructor(expected: string, received: Token | null) {
-    super(`Expected ${expected}, received ${brandToken(received)}`);
-    if (received) {
-      this._stack.push(received);
-    }
+class MatchError extends InternalParseError {
+  constructor(expected: string, received: Token | EofToken) {
+    super(`Expected ${expected}, received ${brandToken(received)}`, received);
+  }
+}
+
+class RuleError extends InternalParseError {
+  constructor(ruleName: string, prev: InternalParseError) {
+    super(`${prev.message}\n  in ${ruleName}`, prev.pos);
   }
 }
 
@@ -39,16 +41,16 @@ export class ParseState {
   private index = 0;
   constructor(private readonly tokens: Token[]) {}
   private results: unknown[] = [];
-  next(): Token | null {
-    return this.tokens[this.index++];
+  next(): Token | EofToken {
+    return this.tokens[this.index++] || this.eofToken();
   }
-  peek(): Token | null {
-    return this.tokens[this.index] || null;
+  peek(): Token | EofToken {
+    return this.tokens[this.index] || this.eofToken();
   }
   push(x: unknown): void {
     this.results.push(x);
   }
-  reduce(arity: number, fn: (...xs: unknown[]) => unknown) {
+  reduce(arity: number, fn: (...xs: unknown[]) => unknown): void {
     const args: unknown[] = [];
     for (let i = 0; i < arity; i++) {
       args.unshift(this.results.pop());
@@ -56,7 +58,22 @@ export class ParseState {
     this.results.push(fn(...args));
   }
   done(): unknown {
-    return this.results.pop();
+    if (this.index === this.tokens.length) {
+      return this.results.pop();
+    } else {
+      throw new MatchError("end of input", this.peek());
+    }
+  }
+  private eofToken(): EofToken {
+    const lastToken = this.tokens[this.tokens.length - 1];
+    return lastToken
+      ? {
+          type: "eof",
+          index: lastToken.index + 1,
+          outerIndex: lastToken.outerIndex,
+          length: 0,
+        }
+      : { type: "eof", index: 0, outerIndex: 0, length: 0 };
   }
 }
 
@@ -80,13 +97,13 @@ export class MatchLiteral implements Parser {
   parse(state: ParseState): void {
     const token = state.next();
     if (
-      !token ||
-      !["operator", "keyword"].includes(token.type) ||
-      token.value !== this.value
+      (token.type === "operator" || token.type === "keyword") &&
+      token.value === this.value
     ) {
+      state.push(token.value);
+    } else {
       throw new MatchError(brandLiteral(this.value), token);
     }
-    state.push(token.value);
   }
 }
 
@@ -97,10 +114,11 @@ export class MatchRule implements Parser {
       this.parsers.get(this.ruleName)!.parse(state);
     } catch (e) {
       // istanbul ignore else
-      if (e instanceof ParseError) {
-        e._stack.push({ type: "rule", name: this.ruleName });
+      if (e instanceof InternalParseError) {
+        throw new RuleError(this.ruleName.description || "(anonymous)", e);
+      } else {
+        throw e;
       }
-      throw e;
     }
   }
 }
@@ -132,7 +150,10 @@ export class Alt implements Parser {
       parser = this.parserMap.get(brandEof);
     }
     if (!parser) {
-      throw new MatchError([...this.parserMap.keys()].join(), token);
+      throw new MatchError(
+        "one of " + [...this.parserMap.keys()].join(),
+        token
+      );
     }
     parser.parse(state);
   }
