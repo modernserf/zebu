@@ -54,3 +54,22 @@ test("interpolation", () => {
     { type: "value", value: "4" },
   ]);
 });
+
+test("no match for token", () => {
+  expect(() => {
+    tok`1 + 2`;
+  }).toThrow();
+});
+
+test("unexpected newline in string", () => {
+  expect(() => {
+    tok`"foo
+    bar"`;
+  }).toThrow();
+});
+
+test("string incomplete", () => {
+  expect(() => {
+    tok`"foo`;
+  }).toThrow();
+});

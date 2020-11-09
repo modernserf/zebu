@@ -1,3 +1,5 @@
+import { TokenPosition, ZebuError } from "./util";
+
 type TokenContent =
   | {
       type: "value";
@@ -16,31 +18,22 @@ type TokenContent =
       value: string;
     };
 
-/*
- * outerIndex: index of string in interpolation
- * index: position in string
- * length: length of matched pattern
- * NOTE: an interpolation is treated as if it as it index 0 and has a length of 0.
- * If a token spans across an interpolation (e.g. its a quoted string with an interpolation),
- * the length will be the sum of the string parts, e.g.
- * the length of "foo${x}bar", which is parsed as [`"foo`, x, bar"`], is 8
- */
-type TokenPosition = {
-  index: number;
-  outerIndex: number;
-  length: number;
-};
-
 export type Token = TokenContent & TokenPosition;
 
-class LexerError {
-  constructor(
-    public readonly index: number,
-    public readonly outerIndex: number
-  ) {}
+abstract class LexerError {
+  message: string;
+  constructor(public pos: TokenPosition) {}
 }
 
-class NoTokenMatchError extends LexerError {}
+class NoTokenMatchError extends LexerError {
+  message = "No match for token";
+}
+class StringNewlineError extends LexerError {
+  message = "Unexpected newline in string";
+}
+class StringIncompleteError extends LexerError {
+  message = "Unexpected end of input in string";
+}
 
 class LexerState {
   index = 0;
@@ -126,7 +119,16 @@ export class Lexer {
   }
   run(strs: readonly string[], interps: unknown[]): Token[] {
     this.lexerState = new LexerState(strs, interps);
-    this.mainState();
+    try {
+      this.mainState();
+    } catch (e) {
+      // istanbul ignore else
+      if (e instanceof LexerError) {
+        throw new ZebuError(e.message, strs, e.pos);
+      } else {
+        throw e;
+      }
+    }
     return this.lexerState.getTokens();
   }
   private mainState() {
@@ -148,9 +150,12 @@ export class Lexer {
 
         const lastIndex = lexerState.index;
         const match = lexerState.matchPattern(this.mainPattern);
-        /* istanbul ignore next */
         if (!match) {
-          throw new NoTokenMatchError(lexerState.index, lexerState.outerIndex);
+          throw new NoTokenMatchError({
+            index: lexerState.index,
+            outerIndex: lexerState.outerIndex,
+            length: 1,
+          });
         }
         const matchedString = match[0];
 
@@ -202,7 +207,7 @@ export class Lexer {
       while (lexerState.nextChar()) {
         const match = lexerState.matchPattern(pattern);
         // TODO: what could this be besides a newline? Why _shouldn't_ a newline be allowed?
-        if (!match) throw new Error("newline not allowed in string");
+        if (!match) throw new StringNewlineError(token);
 
         if (match[1]) {
           // quote body
@@ -215,14 +220,13 @@ export class Lexer {
           return;
         }
       }
-      // if interpolating mid-string, interpolate the value _into_ the strin
+      // if interpolating mid-string, interpolate the value _into_ the string
       const interpolatedToken = lexerState.getInterpolation();
       if (interpolatedToken) {
         token.value += String(interpolatedToken.value);
       }
     }
-    // TODO
-    throw new Error("string left open");
+    throw new StringIncompleteError(token);
   }
   private comment(pattern: RegExp) {
     while (this.lexerState.hasStrings()) {
