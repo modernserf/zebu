@@ -10,15 +10,13 @@ import {
   Seq,
   ParseState,
   InternalParseError,
+  brandEof,
+  brandLiteral,
+  brandType,
+  Terminal,
 } from "./parser-combinators";
 import { resolveConflicts } from "./resolve-conflicts";
 import { assertUnreachable, ParseError, CompileError } from "./util";
-
-type Brand<K, T> = K & { __brand: T };
-export type Terminal = Brand<string, "Terminal">;
-export const brandLiteral = (value: string) => `"${value}"` as Terminal;
-export const brandType = (type: string) => `<${type}>` as Terminal;
-export const brandEof = "(end of input)" as Terminal;
 
 export type SimpleASTAlt = { type: "alt"; exprs: Array<SimpleASTSeq> };
 export type SimpleASTSeq = { type: "seq"; exprs: SimpleASTNode[] };

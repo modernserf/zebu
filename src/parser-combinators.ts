@@ -1,6 +1,11 @@
 import { Token } from "./lexer";
-import { brandEof, brandLiteral, brandType, Terminal } from "./parser-ll";
 import { TokenPosition } from "./util";
+
+type Brand<K, T> = K & { __brand: T };
+export type Terminal = Brand<string, "Terminal">;
+export const brandLiteral = (value: string) => `"${value}"` as Terminal;
+export const brandType = (type: string) => `<${type}>` as Terminal;
+export const brandEof = "(end of input)" as Terminal;
 
 type EofToken = {
   type: "eof";

@@ -1,3 +1,4 @@
+/*
 import { lang } from "../lang";
 
 // prettier-ignore
@@ -207,3 +208,4 @@ class Subset<T> extends Range<T> {
     }
   }
 }
+*/
