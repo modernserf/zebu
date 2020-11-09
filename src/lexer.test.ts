@@ -1,7 +1,7 @@
-import { Lexer, Token } from "./lexer";
+import { Lexer, Token } from './lexer';
 
-const operators = new Set(["{", "}", "(", ")", ">", ";"]);
-const keywords = new Set(["if", "else"]);
+const operators = new Set(['{', '}', '(', ')', '>', ';']);
+const keywords = new Set(['if', 'else']);
 
 function tok(strs: TemplateStringsArray, ...interps: unknown[]) {
   return new Lexer(keywords, operators).run(strs.raw, interps);
@@ -10,34 +10,34 @@ function tok(strs: TemplateStringsArray, ...interps: unknown[]) {
 function strip(token: Token) {
   return {
     type: token.type,
-    value: "value" in token ? token.value : undefined,
+    value: 'value' in token ? token.value : undefined,
   };
 }
 
-test("basic tokens", () => {
+test('basic tokens', () => {
   expect(tok`if foo > 1 { bar('baz'); }`.map(strip)).toEqual([
-    { type: "keyword", value: "if" },
-    { type: "identifier", value: "foo" },
-    { type: "operator", value: ">" },
-    { type: "value", value: 1 },
-    { type: "operator", value: "{" },
-    { type: "identifier", value: "bar" },
-    { type: "operator", value: "(" },
-    { type: "value", value: "baz" },
-    { type: "operator", value: ")" },
-    { type: "operator", value: ";" },
-    { type: "operator", value: "}" },
+    { type: 'keyword', value: 'if' },
+    { type: 'identifier', value: 'foo' },
+    { type: 'operator', value: '>' },
+    { type: 'value', value: 1 },
+    { type: 'operator', value: '{' },
+    { type: 'identifier', value: 'bar' },
+    { type: 'operator', value: '(' },
+    { type: 'value', value: 'baz' },
+    { type: 'operator', value: ')' },
+    { type: 'operator', value: ';' },
+    { type: 'operator', value: '}' },
   ]);
 
   expect(() => tok`"foo`).toThrow();
   expect(() => tok`"\n"`).toThrow();
 });
 
-test("interpolation", () => {
+test('interpolation', () => {
   expect(tok`1 ${2} /* ${3} */ "${4}" // ${5}`.map(strip)).toEqual([
-    { type: "value", value: 1 },
-    { type: "value", value: 2 },
-    { type: "value", value: "4" },
+    { type: 'value', value: 1 },
+    { type: 'value', value: 2 },
+    { type: 'value', value: '4' },
   ]);
 
   expect(
@@ -49,26 +49,26 @@ test("interpolation", () => {
       // ${5}
     `.map(strip)
   ).toEqual([
-    { type: "value", value: 1 },
-    { type: "value", value: 2 },
-    { type: "value", value: "4" },
+    { type: 'value', value: 1 },
+    { type: 'value', value: 2 },
+    { type: 'value', value: '4' },
   ]);
 });
 
-test("no match for token", () => {
+test('no match for token', () => {
   expect(() => {
     tok`1 + 2`;
   }).toThrow();
 });
 
-test("unexpected newline in string", () => {
+test('unexpected newline in string', () => {
   expect(() => {
     tok`"foo
     bar"`;
   }).toThrow();
 });
 
-test("string incomplete", () => {
+test('string incomplete', () => {
   expect(() => {
     tok`"foo`;
   }).toThrow();

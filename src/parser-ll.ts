@@ -1,5 +1,5 @@
-import { AST } from "./core";
-import { identifierPattern, Lexer } from "./lexer";
+import { AST } from './core';
+import { identifierPattern, Lexer } from './lexer';
 import {
   Alt,
   MatchLiteral,
@@ -14,208 +14,33 @@ import {
   brandLiteral,
   brandType,
   Terminal,
-} from "./parser-combinators";
-import { resolveConflicts } from "./resolve-conflicts";
-import { assertUnreachable, ParseError, CompileError } from "./util";
+} from './parser-combinators';
+import { resolveConflicts } from './resolve-conflicts';
+import { assertUnreachable, ParseError, CompileError } from './util';
 
-export type SimpleASTAlt = { type: "alt"; exprs: Array<SimpleASTSeq> };
-export type SimpleASTSeq = { type: "seq"; exprs: SimpleASTNode[] };
+export type SimpleASTAlt = { type: 'alt'; exprs: Array<SimpleASTSeq> };
+export type SimpleASTSeq = { type: 'seq'; exprs: SimpleASTNode[] };
 
 type SeqFn = (...xs: unknown[]) => unknown;
 export type SimpleASTNode =
-  | { type: "literal"; value: string }
-  | { type: "identifier" }
-  | { type: "value" }
-  | { type: "nonterminal"; value: symbol }
-  | { type: "reduce"; arity: number; fn: SeqFn | null };
+  | { type: 'literal'; value: string }
+  | { type: 'identifier' }
+  | { type: 'value' }
+  | { type: 'nonterminal'; value: symbol }
+  | { type: 'reduce'; arity: number; fn: SeqFn | null };
 
 export type SimpleAST = SimpleASTNode | SimpleASTSeq | SimpleASTAlt;
 
 const _2 = (_, x) => x;
 const cons = (h, t: unknown[]) => [h, ...t];
 const pushNull: SimpleASTSeq = {
-  type: "seq",
-  exprs: [{ type: "reduce", arity: 0, fn: () => null }],
+  type: 'seq',
+  exprs: [{ type: 'reduce', arity: 0, fn: () => null }],
 };
 const pushArr: SimpleASTSeq = {
-  type: "seq",
-  exprs: [{ type: "reduce", arity: 0, fn: () => [] }],
+  type: 'seq',
+  exprs: [{ type: 'reduce', arity: 0, fn: () => [] }],
 };
-
-export class ASTSimplifier {
-  rules = new Map<symbol, SimpleASTAlt>();
-  scope = new ScopeManager();
-  literals = new LiteralManager();
-  static simplifyAll(node: AST) {
-    return new ASTSimplifier().simplifyAll(node);
-  }
-  private simplifyAll(node: AST) {
-    const startRule = Symbol("start");
-    this.rules.set(startRule, this.simplifyAlt(node));
-    resolveConflicts(this.rules, startRule);
-
-    const { keywords, operators } = this.literals.compile(this.rules);
-    return {
-      startRule,
-      rules: this.rules,
-      keywords,
-      operators,
-    };
-  }
-  private simplifyAlt(node: AST): SimpleASTAlt {
-    switch (node.type) {
-      case "alt":
-        return {
-          type: "alt",
-          exprs: node.exprs.map((expr) => this.simplifySeq(expr)),
-        };
-      case "maybe":
-        return {
-          type: "alt",
-          exprs: [this.simplifySeq(node.expr), pushNull],
-        };
-      case "sepBy0":
-        return {
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [
-                this.simplifyNode({
-                  type: "sepBy1",
-                  expr: node.expr,
-                  separator: node.separator,
-                }),
-              ],
-            },
-            pushArr,
-          ],
-        };
-      default:
-        return { type: "alt", exprs: [this.simplifySeq(node)] };
-    }
-  }
-  private simplifySeq(node: AST): SimpleASTSeq {
-    switch (node.type) {
-      case "structure":
-        return {
-          type: "seq",
-          exprs: [
-            this.literals.add(node.startToken),
-            this.simplifyNode(node.expr),
-            this.literals.add(node.endToken),
-            { type: "reduce", arity: 3, fn: _2 },
-          ],
-        };
-      case "seq":
-        return {
-          type: "seq",
-          exprs: node.exprs
-            .map((expr) => this.simplifyNode(expr))
-            .concat([
-              { type: "reduce", arity: node.exprs.length, fn: node.fn },
-            ]),
-        };
-      case "repeat1":
-        return {
-          type: "seq",
-          exprs: [
-            this.simplifyNode(node.expr),
-            this.simplifyNode({ type: "repeat0", expr: node.expr }),
-            { type: "reduce", arity: 2, fn: cons },
-          ],
-        };
-      default:
-        return { type: "seq", exprs: [this.simplifyNode(node)] };
-    }
-  }
-  private simplifyNode(node: AST): SimpleASTNode {
-    switch (node.type) {
-      case "error":
-        throw new CompileError(node.message);
-      case "repeat1":
-      case "structure":
-      case "seq":
-      case "alt":
-      case "sepBy0":
-      case "maybe": {
-        const ruleName = Symbol();
-        this.rules.set(ruleName, this.simplifyAlt(node));
-        return { type: "nonterminal", value: ruleName };
-      }
-      case "ruleset":
-        return this.scope.compileRuleset(node.rules, (name, expr) => {
-          this.rules.set(name, this.simplifyAlt(expr));
-        });
-      case "literal":
-        return this.literals.add(node.value);
-      case "terminal":
-        return this.literals.terminal(node);
-      case "identifier":
-        return { type: "nonterminal", value: this.scope.lookup(node.value) };
-      case "repeat0": {
-        // A = Expr* ---> A = Expr A | nil
-        const recur: SimpleASTNode = { type: "nonterminal", value: Symbol() };
-        this.rules.set(recur.value, {
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [
-                this.simplifyNode(node.expr),
-                recur,
-                { type: "reduce", arity: 2, fn: cons },
-              ],
-            },
-            pushArr,
-          ],
-        });
-        return recur;
-      }
-      case "sepBy1": {
-        // A = Expr (Sep Expr)* Sep?
-        // --->
-        // A = Expr B
-        // B = Sep C | nil
-        // C = A | nil
-        const A: SimpleASTNode = { type: "nonterminal", value: Symbol() };
-        const B: SimpleASTNode = { type: "nonterminal", value: Symbol() };
-        const C: SimpleASTNode = { type: "nonterminal", value: Symbol() };
-        const expr = this.simplifyNode(node.expr);
-        const sep = this.simplifyNode(node.separator);
-
-        this.rules.set(A.value, {
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [expr, B, { type: "reduce", arity: 2, fn: cons }],
-            },
-          ],
-        });
-        this.rules.set(B.value, {
-          type: "alt",
-          exprs: [
-            {
-              type: "seq",
-              exprs: [sep, C, { type: "reduce", arity: 2, fn: _2 }],
-            },
-            pushArr,
-          ],
-        });
-        this.rules.set(C.value, {
-          type: "alt",
-          exprs: [{ type: "seq", exprs: [A] }, pushArr],
-        });
-
-        return A;
-      }
-      // istanbul ignore next
-      default:
-        assertUnreachable(node);
-    }
-  }
-}
 
 class ScopeManager {
   private stack: Array<Map<string, symbol>> = [];
@@ -232,7 +57,7 @@ class ScopeManager {
   ): SimpleASTNode {
     // istanbul ignore next
     if (!rules.length) {
-      throw new CompileError("should be unreachable");
+      throw new CompileError('should be unreachable');
     }
     // build scope lookup
     const nextScope = new Map<string, symbol>();
@@ -252,29 +77,29 @@ class ScopeManager {
 
     // return first rule as identifier
     const firstRuleName = nextScope.get(rules[0].name)!;
-    return { type: "nonterminal", value: firstRuleName };
+    return { type: 'nonterminal', value: firstRuleName };
   }
 }
 
 class LiteralManager {
   private keywords: Set<string> = new Set();
   private operators: Set<string> = new Set();
-  private keywordRule = Symbol("keyword");
-  private operatorRule = Symbol("operator");
+  private keywordRule = Symbol('keyword');
+  private operatorRule = Symbol('operator');
   public add(literal: string): SimpleASTNode {
     if (literal.match(identifierPattern)) {
       this.keywords.add(literal);
     } else {
       this.operators.add(literal);
     }
-    return { type: "literal", value: literal };
+    return { type: 'literal', value: literal };
   }
-  public terminal(node: AST & { type: "terminal" }): SimpleASTNode {
+  public terminal(node: AST & { type: 'terminal' }): SimpleASTNode {
     switch (node.value) {
-      case "keyword":
-        return { type: "nonterminal", value: this.keywordRule };
-      case "operator":
-        return { type: "nonterminal", value: this.operatorRule };
+      case 'keyword':
+        return { type: 'nonterminal', value: this.keywordRule };
+      case 'operator':
+        return { type: 'nonterminal', value: this.operatorRule };
       default:
         return { type: node.value };
     }
@@ -288,13 +113,189 @@ class LiteralManager {
 
 function createAlts(lits: Set<string>): SimpleASTAlt {
   return {
-    type: "alt",
-    exprs: Array.from(lits).map((value) => ({
-      type: "seq",
-      exprs: [{ type: "literal", value }],
+    type: 'alt',
+    exprs: Array.from(lits).map(value => ({
+      type: 'seq',
+      exprs: [{ type: 'literal', value }],
     })),
   };
 }
+
+export class ASTSimplifier {
+  rules = new Map<symbol, SimpleASTAlt>();
+  scope = new ScopeManager();
+  literals = new LiteralManager();
+  static simplifyAll(node: AST) {
+    return new ASTSimplifier().simplifyAll(node);
+  }
+  private simplifyAll(node: AST) {
+    const startRule = Symbol('start');
+    this.rules.set(startRule, this.simplifyAlt(node));
+    resolveConflicts(this.rules, startRule);
+
+    const { keywords, operators } = this.literals.compile(this.rules);
+    return {
+      startRule,
+      rules: this.rules,
+      keywords,
+      operators,
+    };
+  }
+  private simplifyAlt(node: AST): SimpleASTAlt {
+    switch (node.type) {
+      case 'alt':
+        return {
+          type: 'alt',
+          exprs: node.exprs.map(expr => this.simplifySeq(expr)),
+        };
+      case 'maybe':
+        return {
+          type: 'alt',
+          exprs: [this.simplifySeq(node.expr), pushNull],
+        };
+      case 'sepBy0':
+        return {
+          type: 'alt',
+          exprs: [
+            {
+              type: 'seq',
+              exprs: [
+                this.simplifyNode({
+                  type: 'sepBy1',
+                  expr: node.expr,
+                  separator: node.separator,
+                }),
+              ],
+            },
+            pushArr,
+          ],
+        };
+      default:
+        return { type: 'alt', exprs: [this.simplifySeq(node)] };
+    }
+  }
+  private simplifySeq(node: AST): SimpleASTSeq {
+    switch (node.type) {
+      case 'structure':
+        return {
+          type: 'seq',
+          exprs: [
+            this.literals.add(node.startToken),
+            this.simplifyNode(node.expr),
+            this.literals.add(node.endToken),
+            { type: 'reduce', arity: 3, fn: _2 },
+          ],
+        };
+      case 'seq':
+        return {
+          type: 'seq',
+          exprs: node.exprs
+            .map(expr => this.simplifyNode(expr))
+            .concat([
+              { type: 'reduce', arity: node.exprs.length, fn: node.fn },
+            ]),
+        };
+      case 'repeat1':
+        return {
+          type: 'seq',
+          exprs: [
+            this.simplifyNode(node.expr),
+            this.simplifyNode({ type: 'repeat0', expr: node.expr }),
+            { type: 'reduce', arity: 2, fn: cons },
+          ],
+        };
+      default:
+        return { type: 'seq', exprs: [this.simplifyNode(node)] };
+    }
+  }
+  private simplifyNode(node: AST): SimpleASTNode {
+    switch (node.type) {
+      case 'error':
+        throw new CompileError(node.message);
+      case 'repeat1':
+      case 'structure':
+      case 'seq':
+      case 'alt':
+      case 'sepBy0':
+      case 'maybe': {
+        const ruleName = Symbol();
+        this.rules.set(ruleName, this.simplifyAlt(node));
+        return { type: 'nonterminal', value: ruleName };
+      }
+      case 'ruleset':
+        return this.scope.compileRuleset(node.rules, (name, expr) => {
+          this.rules.set(name, this.simplifyAlt(expr));
+        });
+      case 'literal':
+        return this.literals.add(node.value);
+      case 'terminal':
+        return this.literals.terminal(node);
+      case 'identifier':
+        return { type: 'nonterminal', value: this.scope.lookup(node.value) };
+      case 'repeat0': {
+        // A = Expr* ---> A = Expr A | nil
+        const recur: SimpleASTNode = { type: 'nonterminal', value: Symbol() };
+        this.rules.set(recur.value, {
+          type: 'alt',
+          exprs: [
+            {
+              type: 'seq',
+              exprs: [
+                this.simplifyNode(node.expr),
+                recur,
+                { type: 'reduce', arity: 2, fn: cons },
+              ],
+            },
+            pushArr,
+          ],
+        });
+        return recur;
+      }
+      case 'sepBy1': {
+        // A = Expr (Sep Expr)* Sep?
+        // --->
+        // A = Expr B
+        // B = Sep C | nil
+        // C = A | nil
+        const A: SimpleASTNode = { type: 'nonterminal', value: Symbol() };
+        const B: SimpleASTNode = { type: 'nonterminal', value: Symbol() };
+        const C: SimpleASTNode = { type: 'nonterminal', value: Symbol() };
+        const expr = this.simplifyNode(node.expr);
+        const sep = this.simplifyNode(node.separator);
+
+        this.rules.set(A.value, {
+          type: 'alt',
+          exprs: [
+            {
+              type: 'seq',
+              exprs: [expr, B, { type: 'reduce', arity: 2, fn: cons }],
+            },
+          ],
+        });
+        this.rules.set(B.value, {
+          type: 'alt',
+          exprs: [
+            {
+              type: 'seq',
+              exprs: [sep, C, { type: 'reduce', arity: 2, fn: _2 }],
+            },
+            pushArr,
+          ],
+        });
+        this.rules.set(C.value, {
+          type: 'alt',
+          exprs: [{ type: 'seq', exprs: [A] }, pushArr],
+        });
+
+        return A;
+      }
+      // istanbul ignore next
+      default:
+        assertUnreachable(node);
+    }
+  }
+}
+
 
 class FirstSetBuilder {
   cache = new Map<SimpleAST, Set<Terminal>>();
@@ -307,22 +308,22 @@ class FirstSetBuilder {
   }
   private getInner(node: SimpleAST, recurSet: Set<symbol>) {
     switch (node.type) {
-      case "reduce":
+      case 'reduce':
         return new Set([brandEof]);
-      case "literal":
+      case 'literal':
         return new Set([brandLiteral(node.value)]);
-      case "identifier":
-        return new Set([brandType("identifier")]);
-      case "value":
-        return new Set([brandType("value")]);
-      case "nonterminal": {
+      case 'identifier':
+        return new Set([brandType('identifier')]);
+      case 'value':
+        return new Set([brandType('value')]);
+      case 'nonterminal': {
         if (recurSet.has(node.value)) {
           throw new CompileError(`left recursion on ${node.value.description}`);
         }
         const next = this.rules.get(node.value)!;
         return this.get(next, new Set([...recurSet, node.value]));
       }
-      case "seq": {
+      case 'seq': {
         const set = new Set([brandEof]);
         for (const expr of node.exprs) {
           set.delete(brandEof);
@@ -336,7 +337,7 @@ class FirstSetBuilder {
         }
         return set;
       }
-      case "alt": {
+      case 'alt': {
         const set = new Set();
         for (const expr of node.exprs) {
           for (const terminal of this.get(expr, recurSet)) {
@@ -372,20 +373,20 @@ export class ParserCompiler {
   }
   compile(node: SimpleAST): Parser {
     switch (node.type) {
-      case "reduce":
+      case 'reduce':
         return new Reduce(node.arity, node.fn);
-      case "literal":
+      case 'literal':
         return new MatchLiteral(node.value);
-      case "identifier":
-        return new MatchType("identifier");
-      case "value":
-        return new MatchType("value");
-      case "nonterminal":
+      case 'identifier':
+        return new MatchType('identifier');
+      case 'value':
+        return new MatchType('value');
+      case 'nonterminal':
         return new MatchRule(this.compiledRules, node.value);
-      case "seq":
+      case 'seq':
         this.firstSet.get(node);
-        return new Seq(node.exprs.map((expr) => this.compile(expr)));
-      case "alt": {
+        return new Seq(node.exprs.map(expr => this.compile(expr)));
+      case 'alt': {
         if (node.exprs.length === 1) return this.compile(node.exprs[0]);
 
         this.firstSet.get(node);

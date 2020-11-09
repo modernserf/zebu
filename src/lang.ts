@@ -1,5 +1,5 @@
-import { coreAST, AST } from "./core";
-import { createParser } from "./parser-ll";
+import { coreAST, AST } from './core';
+import { createParser } from './parser-ll';
 
 export type ZebuLanguageReturning<Type> = {
   ast: AST;
@@ -28,7 +28,7 @@ export function createLanguage<T>(ast: AST): TemplateStringParser<T> {
 }
 
 const coreParser = createParser(coreAST) as TemplateStringParser<AST>;
-``;
+
 export const lang = ((strs: TemplateStringsArray, ...xs: unknown[]) => {
   const langAST = coreParser(strs, ...xs);
   return createLanguage(langAST);

@@ -1,5 +1,7 @@
 {
-  "version": "0.1.0-beta.0",
+  "name": "zebu",
+  "author": "Justin Falcone",
+  "version": "0.0.3",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -14,7 +16,7 @@
     "start": "tsdx watch",
     "build": "tsdx build",
     "test": "tsdx test",
-    "lint": "tsdx lint",
+    "lint": "tsdx lint src",
     "prepare": "tsdx build",
     "size": "size-limit",
     "analyze": "size-limit --why"
@@ -22,7 +24,7 @@
   "peerDependencies": {},
   "husky": {
     "hooks": {
-      "pre-commit": "tsdx lint"
+      "pre-commit": "npm run lint"
     }
   },
   "prettier": {
@@ -31,8 +33,6 @@
     "singleQuote": true,
     "trailingComma": "es5"
   },
-  "name": "zebu",
-  "author": "Justin Falcone",
   "module": "dist/zebu.esm.js",
   "size-limit": [
     {
@@ -44,8 +44,15 @@
       "limit": "10 KB"
     }
   ],
+  "resolutions": {
+    "**/typescript": "^4.0.5",
+    "**/@typescript-eslint/eslint-plugin": "^4.6.1",
+    "**/@typescript-eslint/parser": "^4.6.1"
+  },
   "devDependencies": {
     "@size-limit/preset-small-lib": "^4.7.0",
+    "@typescript-eslint/eslint-plugin": "^4.7.0",
+    "@typescript-eslint/parser": "^4.7.0",
     "husky": "^4.3.0",
     "size-limit": "^4.7.0",
     "tsdx": "^0.14.1",

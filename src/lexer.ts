@@ -1,20 +1,20 @@
-import { TokenPosition, ParseError } from "./util";
+import { TokenPosition, ParseError } from './util';
 
 type TokenContent =
   | {
-      type: "value";
+      type: 'value';
       value: unknown;
     }
   | {
-      type: "operator";
+      type: 'operator';
       value: string;
     }
   | {
-      type: "identifier";
+      type: 'identifier';
       value: string;
     }
   | {
-      type: "keyword";
+      type: 'keyword';
       value: string;
     };
 
@@ -26,13 +26,13 @@ abstract class LexerError {
 }
 
 class NoTokenMatchError extends LexerError {
-  message = "No match for token";
+  message = 'No match for token';
 }
 class StringNewlineError extends LexerError {
-  message = "Unexpected newline in string";
+  message = 'Unexpected newline in string';
 }
 class StringIncompleteError extends LexerError {
-  message = "Unexpected end of input in string";
+  message = 'Unexpected end of input in string';
 }
 
 class LexerState {
@@ -51,10 +51,10 @@ class LexerState {
     this.tokens.push(token);
   }
   getInterpolation() {
-    let token: (Token & { type: "value" }) | undefined;
+    let token: (Token & { type: 'value' }) | undefined;
     if (this.outerIndex < this.interps.length) {
       token = {
-        type: "value",
+        type: 'value',
         value: this.interps[this.outerIndex],
         index: 0,
         outerIndex: this.outerIndex + 1,
@@ -112,9 +112,9 @@ export class Lexer {
         identifierPattern, // identifier
         operatorsPattern, // operators
       ]
-        .map((re) => `(${re.source})`)
-        .join("|"),
-      "uy"
+        .map(re => `(${re.source})`)
+        .join('|'),
+      'uy'
     );
   }
   run(strs: readonly string[], interps: unknown[]): Token[] {
@@ -166,7 +166,7 @@ export class Lexer {
         } else if (match[4] || match[5] || match[6] || match[7]) {
           const value = Number(matchedString);
           lexerState.push({
-            type: "value",
+            type: 'value',
             value,
             index: lastIndex,
             outerIndex: lexerState.outerIndex,
@@ -174,7 +174,7 @@ export class Lexer {
           });
         } else if (match[8]) {
           lexerState.push({
-            type: this.keywords.has(matchedString) ? "keyword" : "identifier",
+            type: this.keywords.has(matchedString) ? 'keyword' : 'identifier',
             value: matchedString,
             index: lastIndex,
             outerIndex: lexerState.outerIndex,
@@ -182,7 +182,7 @@ export class Lexer {
           });
         } else if (match[9]) {
           lexerState.push({
-            type: "operator",
+            type: 'operator',
             value: matchedString,
             index: lastIndex,
             outerIndex: lexerState.outerIndex,
@@ -197,8 +197,8 @@ export class Lexer {
   private quote(pattern: RegExp) {
     const lexerState = this.lexerState;
     const token: Token = {
-      type: "value",
-      value: "",
+      type: 'value',
+      value: '',
       index: lexerState.index - 1, // -1 for initial quote
       outerIndex: lexerState.outerIndex,
       length: 1,
@@ -241,12 +241,12 @@ export class Lexer {
 }
 
 function reEscape(s: string) {
-  return s.replace(/[/\\^$*+?.()|[\]{}]/g, "\\$&");
+  return s.replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
 function matchOperators(operators: string[]) {
   const longestFirst = Array.from(new Set(operators)).sort(
     (a, b) => b.length - a.length
   );
-  return new RegExp(`(?:${longestFirst.map(reEscape).join("|")})`);
+  return new RegExp(`(?:${longestFirst.map(reEscape).join('|')})`);
 }

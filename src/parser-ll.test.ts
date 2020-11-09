@@ -1,5 +1,5 @@
-import { AST, builders, coreAST } from "./core";
-import { createParser } from "./parser-ll";
+import { AST, builders, coreAST } from './core';
+import { createParser } from './parser-ll';
 
 const {
   ruleset,
@@ -13,7 +13,7 @@ const {
   structure,
 } = builders;
 
-test("json", () => {
+test('json', () => {
   // prettier-ignore
   const grammar = ruleset(
     rule('expr', alt(
@@ -33,13 +33,13 @@ test("json", () => {
   )
   const json = createParser(grammar);
 
-  expect(json`"foo"`).toEqual("foo");
+  expect(json`"foo"`).toEqual('foo');
   expect(json`true`).toEqual(true);
 
   expect(json`{ "foo": 123 }`).toEqual({ foo: 123 });
 });
 
-test("core", () => {
+test('core', () => {
   const lang = createParser(coreAST);
   const returnLangAST = lang`Main = "return" value : ${(_, x) => x}` as AST;
   const returnLang = createParser(returnLangAST);

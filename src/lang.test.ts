@@ -1,12 +1,12 @@
-import { lang } from "./lang";
-import { ParseError, CompileError } from "./util";
+import { lang } from './lang';
+import { ParseError, CompileError } from './util';
 
-test("nil language", () => {
+test('nil language', () => {
   const nil = lang`Main = nil`;
   expect(nil``).toEqual(null);
 });
 
-test("simple values", () => {
+test('simple values', () => {
   const num = lang`Main = "return" value : ${(_, x) => x};`;
   expect(num`return 123`).toEqual(123);
   expect(() => num`yield 123`).toThrow(ParseError);
@@ -16,7 +16,7 @@ test("simple values", () => {
   expect(() => num`return 123 456`).toThrow(ParseError);
 });
 
-test("recursive rules", () => {
+test('recursive rules', () => {
   const math = lang`
     Neg   = "-" Expr : ${(_, value) => -value}
           | Expr;
@@ -29,11 +29,11 @@ test("recursive rules", () => {
   expect(math`-(-(123))`).toEqual(123);
 });
 
-test("undefined rules", () => {
+test('undefined rules', () => {
   expect(() => lang`Rule = Expr`.compile()).toThrow(CompileError);
 });
 
-test("self-recursion", () => {
+test('self-recursion', () => {
   const right = lang`
     Term = Expr "**" Term : ${(l, _, r) => l ** r}
          | Expr;
@@ -48,16 +48,16 @@ test("self-recursion", () => {
   expect(left`2 - 3 - 4`).toEqual(2 - 3 - 4);
 });
 
-test("repeaters", () => {
+test('repeaters', () => {
   const list = lang`
     Expr  = #( Expr* )
           | identifier
   `;
   expect(list`(foo bar (baz quux) xyzzy)`).toEqual([
-    "foo",
-    "bar",
-    ["baz", "quux"],
-    "xyzzy",
+    'foo',
+    'bar',
+    ['baz', 'quux'],
+    'xyzzy',
   ]);
 
   const nonEmptyList = lang`
@@ -65,17 +65,17 @@ test("repeaters", () => {
           | identifier
   `;
   expect(nonEmptyList`(foo bar (baz quux) xyzzy)`).toEqual([
-    "foo",
-    "bar",
-    ["baz", "quux"],
-    "xyzzy",
+    'foo',
+    'bar',
+    ['baz', 'quux'],
+    'xyzzy',
   ]);
   expect(() => nonEmptyList`()`).toThrow(ParseError);
 
   expect(() => lang`Main = (value?)*`.compile()).toThrow(CompileError);
 });
 
-test("if else", () => {
+test('if else', () => {
   const ifElse = lang`
     IfElse = "if" Block ("else" (IfElse | Block))?;
     Block = value;
@@ -86,14 +86,14 @@ test("if else", () => {
   ifElse`if "foo" else if "bar" else if "baz" else "quux"`;
 });
 
-test("interpolated parser", () => {
+test('interpolated parser', () => {
   const list = lang`Main = (include ${lang`Main = value`})+`;
   expect(list`1 2 3`).toEqual([1, 2, 3]);
 
   expect(() => lang`Main = include ${null}`.compile()).toThrow(CompileError);
 });
 
-test("keyword and operator terminals", () => {
+test('keyword and operator terminals', () => {
   const it = lang`
     Statement = "print" Expr;
     Expr      = DotExpr ("+" Expr)*;
@@ -111,21 +111,21 @@ test("keyword and operator terminals", () => {
   }).toThrow(ParseError);
 });
 
-test("separators", () => {
+test('separators', () => {
   const list1 = lang`Rule = identifier ++ ","`;
-  expect(list1`foo`).toEqual(["foo"]);
-  expect(list1`foo,`).toEqual(["foo"]);
-  expect(list1`foo, bar, baz`).toEqual(["foo", "bar", "baz"]);
+  expect(list1`foo`).toEqual(['foo']);
+  expect(list1`foo,`).toEqual(['foo']);
+  expect(list1`foo, bar, baz`).toEqual(['foo', 'bar', 'baz']);
 
   const list0 = lang`Rule = (identifier ** ",")`;
   expect(list0``).toEqual([]);
-  expect(list0`foo`).toEqual(["foo"]);
-  expect(list0`foo,`).toEqual(["foo"]);
-  expect(list0`foo, bar, baz`).toEqual(["foo", "bar", "baz"]);
+  expect(list0`foo`).toEqual(['foo']);
+  expect(list0`foo,`).toEqual(['foo']);
+  expect(list0`foo, bar, baz`).toEqual(['foo', 'bar', 'baz']);
 });
 
-test("structures", () => {
-  const fromPairs = (pairs) => pairs.reduce((l, r) => Object.assign(l, r), {});
+test('structures', () => {
+  const fromPairs = pairs => pairs.reduce((l, r) => Object.assign(l, r), {});
   const json = lang`
     Expr = #{ Pair ** "," : ${fromPairs} }
          | #[ Expr ** "," ]
@@ -136,15 +136,15 @@ test("structures", () => {
     Pair = value ":" Expr : ${(k, _, v) => ({ [k]: v })}; 
   `;
   expect(json`{"foo": [123, "bar", true, false, null] }`).toEqual({
-    foo: [123, "bar", true, false, null],
+    foo: [123, 'bar', true, false, null],
   });
 });
 
-test("unresolvable conflicts", () => {
+test('unresolvable conflicts', () => {
   expect(() => lang`Main = value? value`.compile()).toThrow(CompileError);
   expect(() =>
-    lang`Main = value ${() => "x"} 
-              | value ${() => "y"};
+    lang`Main = value ${() => 'x'} 
+              | value ${() => 'y'};
         `.compile()
   ).toThrow(CompileError);
 });

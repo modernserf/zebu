@@ -1,6 +1,6 @@
-import { coreAST, print, builders } from "./core";
+import { coreAST, print, builders } from './core';
 
-test("pretty-printer", () => {
+test('pretty-printer', () => {
   expect(print(coreAST)).toEqual(`
 Grammar = Rule ++ ";"
 Rule = identifier "=" AltExpr
@@ -28,13 +28,13 @@ Expr = #( AltExpr )
 
   const { error, repeat0, sepBy0, lit, seq, alt } = builders;
 
-  const grammarWithOtherTokens = repeat0(sepBy0(error("message"), lit("foo")));
+  const grammarWithOtherTokens = repeat0(sepBy0(error('message'), lit('foo')));
   expect(print(grammarWithOtherTokens)).toEqual(`(<error: message> ** "foo")*`);
 
   const grammarWithInnerAlt = seq(
     () => null,
-    alt(lit("foo"), lit("bar")),
-    lit("baz")
+    alt(lit('foo'), lit('bar')),
+    lit('baz')
   );
   expect(print(grammarWithInnerAlt)).toEqual(`("foo" | "bar") "baz"`);
 

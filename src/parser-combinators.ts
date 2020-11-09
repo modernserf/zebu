@@ -1,22 +1,22 @@
-import { Token } from "./lexer";
-import { TokenPosition } from "./util";
+import { Token } from './lexer';
+import { TokenPosition } from './util';
 
 type Brand<K, T> = K & { __brand: T };
-export type Terminal = Brand<string, "Terminal">;
+export type Terminal = Brand<string, 'Terminal'>;
 export const brandLiteral = (value: string) => `"${value}"` as Terminal;
 export const brandType = (type: string) => `<${type}>` as Terminal;
-export const brandEof = "(end of input)" as Terminal;
+export const brandEof = '(end of input)' as Terminal;
 
 type EofToken = {
-  type: "eof";
+  type: 'eof';
   index: number;
   outerIndex: number;
   length: number;
 };
 
 const brandToken = (token: Token | EofToken) => {
-  if (token.type === "eof") return brandEof;
-  if (token.type === "identifier" || token.type === "value") {
+  if (token.type === 'eof') return brandEof;
+  if (token.type === 'identifier' || token.type === 'value') {
     return brandType(token.type);
   } else {
     return brandLiteral(token.value);
@@ -66,19 +66,19 @@ export class ParseState {
     if (this.index === this.tokens.length) {
       return this.results.pop();
     } else {
-      throw new MatchError("end of input", this.peek());
+      throw new MatchError('end of input', this.peek());
     }
   }
   private eofToken(): EofToken {
     const lastToken = this.tokens[this.tokens.length - 1];
     return lastToken
       ? {
-          type: "eof",
+          type: 'eof',
           index: lastToken.index + 1,
           outerIndex: lastToken.outerIndex,
           length: 0,
         }
-      : { type: "eof", index: 0, outerIndex: 0, length: 0 };
+      : { type: 'eof', index: 0, outerIndex: 0, length: 0 };
   }
 }
 
@@ -87,7 +87,7 @@ export interface Parser {
 }
 
 export class MatchType implements Parser {
-  constructor(private type: "identifier" | "value") {}
+  constructor(private type: 'identifier' | 'value') {}
   parse(state: ParseState): void {
     const token = state.next();
     if (!token || token.type !== this.type) {
@@ -102,7 +102,7 @@ export class MatchLiteral implements Parser {
   parse(state: ParseState): void {
     const token = state.next();
     if (
-      (token.type === "operator" || token.type === "keyword") &&
+      (token.type === 'operator' || token.type === 'keyword') &&
       token.value === this.value
     ) {
       state.push(token.value);
@@ -120,7 +120,7 @@ export class MatchRule implements Parser {
     } catch (e) {
       // istanbul ignore else
       if (e instanceof InternalParseError) {
-        throw new RuleError(this.ruleName.description || "(anonymous)", e);
+        throw new RuleError(this.ruleName.description || '(anonymous)', e);
       } else {
         throw e;
       }
@@ -142,7 +142,7 @@ export class Seq implements Parser {
 export class Reduce implements Parser {
   constructor(private arity: number, private fn: SeqFn | null) {}
   parse(state: ParseState): void {
-    state.reduce(this.arity, this.fn || ((x) => x));
+    state.reduce(this.arity, this.fn || (x => x));
   }
 }
 
@@ -156,7 +156,7 @@ export class Alt implements Parser {
     }
     if (!parser) {
       throw new MatchError(
-        "one of " + [...this.parserMap.keys()].join(),
+        'one of ' + [...this.parserMap.keys()].join(),
         token
       );
     }

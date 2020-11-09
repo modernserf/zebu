@@ -89,6 +89,7 @@ export function showInContext(
 
   scan(strs, startPos, 1, (ch, { index, outerIndex }) => {
     if (outerIndex > 0 && index === 0) {
+      // eslint-disable-next-line no-template-curly-in-string
       strInContext += "${...}";
       if (offset > 0 && offset <= pos.length) {
         underline += "^^^^^^";
