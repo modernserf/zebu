@@ -142,8 +142,18 @@ test('structures', () => {
 
 test('unresolvable conflicts', () => {
   expect(() => lang`Main = value? value`.compile()).toThrow(CompileError);
+  expect(() => lang`Main = "foo" value? value`.compile()).toThrow(CompileError);
+  // TODO: why does this throw, but not the rule below?
+  expect(() => {
+    lang`
+      Main = Loop value;
+      Loop = value Loop : ${(l, r) => [l, ...r]}
+           | nil : ${() => []};
+    `.compile();
+  }).toThrow(CompileError);
+  // expect(() => lang`Main = value* value`.compile()).toThrow(CompileError);
   expect(() =>
-    lang`Main = value ${() => 'x'} 
+    lang`Main = value ${() => 'x'}
               | value ${() => 'y'};
         `.compile()
   ).toThrow(CompileError);

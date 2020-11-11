@@ -1,5 +1,10 @@
-import { SimpleASTAlt, SimpleASTNode, SimpleASTSeq } from './parser-ll';
-import { factorLeft, fixLeftRecursion, inlineRules } from './resolve-conflicts';
+import {
+  SimpleASTAlt,
+  SimpleASTNode,
+  SimpleASTSeq,
+  factorLeft,
+  fixLeftRecursion,
+} from './simplifier';
 
 const alt = (...exprs: SimpleASTSeq[]): SimpleASTAlt => ({
   type: 'alt',
@@ -11,25 +16,6 @@ const seq = (...exprs: SimpleASTNode[]): SimpleASTSeq => ({
 });
 const nt = (value: symbol): SimpleASTNode => ({ type: 'nonterminal', value });
 const lit = (value: string): SimpleASTNode => ({ type: 'literal', value });
-
-test('inlineRules', () => {
-  const root = Symbol('root');
-  const A = Symbol('A');
-  const B = Symbol('B');
-  const rules = new Map([
-    [root, alt(seq(lit('x'), nt(A)), seq(nt(B), lit('y')))],
-    [A, alt(seq(lit('a')))],
-    [B, alt(seq(lit('b')))],
-  ]);
-  inlineRules(rules, root);
-  expect(rules).toEqual(
-    new Map([
-      [root, alt(seq(lit('x'), lit('a')), seq(lit('b'), lit('y')))],
-      [A, alt(seq(lit('a')))],
-      [B, alt(seq(lit('b')))],
-    ])
-  );
-});
 
 test('factorLeft', () => {
   const root = Symbol('root');

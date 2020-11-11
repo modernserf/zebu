@@ -4,6 +4,18 @@ export function assertUnreachable(value: never): never {
   throw new Error(`unreachable`);
 }
 
+export function union<T>(left: Set<T>, right: Set<T>): Set<T> {
+  return new Set([...left, ...right]);
+}
+
+export function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
+  const out = new Set<T>();
+  for (const item of left) {
+    if (right.has(item)) out.add(item);
+  }
+  return out;
+}
+
 export function partition<T>(xs: T[], fn: (x: T) => boolean): [T[], T[]] {
   const trues: T[] = [];
   const falses: T[] = [];

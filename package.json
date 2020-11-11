@@ -2,7 +2,7 @@
   "name": "zebu",
   "author": "Justin Falcone",
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "ISC",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
@@ -31,7 +31,9 @@
     "printWidth": 80,
     "semi": true,
     "singleQuote": true,
-    "trailingComma": "es5"
+    "trailingComma": "es5",
+    "tabWidth": 2,
+    "useTabs": false
   },
   "module": "dist/zebu.esm.js",
   "size-limit": [
