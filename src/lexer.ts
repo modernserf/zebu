@@ -2,19 +2,15 @@ import { TokenPosition, ParseError } from './util';
 
 type TokenContent =
   | {
+      type: 'literal';
+      value: string;
+    }
+  | {
       type: 'value';
       value: unknown;
     }
   | {
-      type: 'operator';
-      value: string;
-    }
-  | {
       type: 'identifier';
-      value: string;
-    }
-  | {
-      type: 'keyword';
       value: string;
     };
 
@@ -174,7 +170,7 @@ export class Lexer {
           });
         } else if (match[8]) {
           lexerState.push({
-            type: this.keywords.has(matchedString) ? 'keyword' : 'identifier',
+            type: this.keywords.has(matchedString) ? 'literal' : 'identifier',
             value: matchedString,
             index: lastIndex,
             outerIndex: lexerState.outerIndex,
@@ -182,7 +178,7 @@ export class Lexer {
           });
         } else if (match[9]) {
           lexerState.push({
-            type: 'operator',
+            type: 'literal',
             value: matchedString,
             index: lastIndex,
             outerIndex: lexerState.outerIndex,

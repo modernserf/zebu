@@ -90,7 +90,7 @@ export class MatchType implements Parser {
   constructor(private type: 'identifier' | 'value') {}
   parse(state: ParseState): void {
     const token = state.next();
-    if (!token || token.type !== this.type) {
+    if (token.type !== this.type) {
       throw new MatchError(brandType(this.type), token);
     }
     state.push(token.value);
@@ -101,10 +101,7 @@ export class MatchLiteral implements Parser {
   constructor(private value: string) {}
   parse(state: ParseState): void {
     const token = state.next();
-    if (
-      (token.type === 'operator' || token.type === 'keyword') &&
-      token.value === this.value
-    ) {
+    if (token.type === 'literal' && token.value === this.value) {
       state.push(token.value);
     } else {
       throw new MatchError(brandLiteral(this.value), token);

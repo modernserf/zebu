@@ -16,17 +16,17 @@ function strip(token: Token) {
 
 test('basic tokens', () => {
   expect(tok`if foo > 1 { bar('baz'); }`.map(strip)).toEqual([
-    { type: 'keyword', value: 'if' },
+    { type: 'literal', value: 'if' },
     { type: 'identifier', value: 'foo' },
-    { type: 'operator', value: '>' },
+    { type: 'literal', value: '>' },
     { type: 'value', value: 1 },
-    { type: 'operator', value: '{' },
+    { type: 'literal', value: '{' },
     { type: 'identifier', value: 'bar' },
-    { type: 'operator', value: '(' },
+    { type: 'literal', value: '(' },
     { type: 'value', value: 'baz' },
-    { type: 'operator', value: ')' },
-    { type: 'operator', value: ';' },
-    { type: 'operator', value: '}' },
+    { type: 'literal', value: ')' },
+    { type: 'literal', value: ';' },
+    { type: 'literal', value: '}' },
   ]);
 
   expect(() => tok`"foo`).toThrow();

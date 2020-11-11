@@ -1,10 +1,11 @@
-import { identifierOrOperator, Token } from './lexer';
+import { identifierOrOperator } from './lexer';
 import { assertUnreachable } from './util';
 
+type TerminalType = 'keyword' | 'operator' | 'identifier' | 'value';
 export type AST =
   | { type: 'error'; message: string }
   | { type: 'literal'; value: string }
-  | { type: 'terminal'; value: Token['type'] }
+  | { type: 'terminal'; value: TerminalType }
   | { type: 'identifier'; value: string }
   | { type: 'structure'; startToken: string; endToken: string; expr: AST }
   | { type: 'maybe'; expr: AST }
@@ -89,7 +90,7 @@ type SeqFn = (...xs: any[]) => unknown;
 const error = (message: string): AST => ({ type: 'error', message });
 const ident = (value: string): AST => ({ type: 'identifier', value });
 const lit = (value: string): AST => ({ type: 'literal', value });
-const terminal = (value: Token['type']): AST => ({ type: 'terminal', value });
+const terminal = (value: TerminalType): AST => ({ type: 'terminal', value });
 const alt = (...exprs: AST[]): AST => ({ type: 'alt', exprs });
 const seq = (fn: SeqFn | null, ...exprs: AST[]): AST => ({
   type: 'seq',
