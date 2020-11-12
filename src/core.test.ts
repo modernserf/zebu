@@ -6,8 +6,8 @@ Grammar = Rule ++ ";"
 Rule = identifier "=" AltExpr
 AltExpr = SeqExpr ++ "|"
 SeqExpr = SepExpr+ (":" value)?
-SepExpr = RepExpr "**" RepExpr
-        | RepExpr "++" RepExpr
+SepExpr = SepExpr "**" RepExpr
+        | SepExpr "++" RepExpr
         | RepExpr
 RepExpr = Expr "*"
         | Expr "+"

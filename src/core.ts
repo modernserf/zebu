@@ -151,9 +151,9 @@ export const coreAST = ruleset(
   )),
   rule('SepExpr', alt(
     seq((expr, _, sep) => sepBy0(expr, sep), 
-      ident('RepExpr'), lit('**'), ident('RepExpr')),
+      ident('SepExpr'), lit('**'), ident('RepExpr')),
     seq((expr, _, sep) => sepBy1(expr, sep), 
-      ident('RepExpr'), lit('++'), ident('RepExpr')),
+      ident('SepExpr'), lit('++'), ident('RepExpr')),
     ident('RepExpr'),
   )),
   rule('RepExpr', alt(

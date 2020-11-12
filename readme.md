@@ -14,37 +14,116 @@ Implementing a general-purpose, high-performance programming language is, indeed
 
 Zebu is a toolkit for building these little languages that handles the boring and error-prone parts (ie. turning a string into structured data) so you can focus on providing a great developer experience.
 
-## Can you go into more detail?
+## How is Zebu different from similar tools?
 
 Zebu is a parser generator that broadly resembles tools like Yacc, Bison or ANTLR. It works with LL(k) grammars, though like ANTLR it can also handle direct left recursion. Like the aforementioned tools, but unlike PEG and parser combinator libraries, Zebu has separate lexing and parsing phases.
 
-The major difference between Zebu and other parser generators is that Zebu uses the same lexer for all grammars:
+The major difference between Zebu and other parser generators is that Zebu applies the principle of "convention over configuration" to parsing. Specifically, all languagees created with Zebu use these lexing rules:
 
 - whitespace (including newlines) and JavaScript-styled comments (`//` and `/* */`) are ignored
 - numbers, strings, and identifiers are tokenized with the same syntactic rules as JavaScript
 
-In practice, this means that languages created with Zebu will necessarily have a strong family resemblance to JavaScript, and feel more like custom operators or macros than they feel like discrete languages. This means that Zebu is best for creating new languages, not implementing an already existing language.
+In other words: Zebu is not a general-purpose parser generator; languages created with Zebu will necessarily have a strong family resemblance to JavaScript, even if they are structured very differently. However, we believe what you give up in terms of expressivity are more than made up for by improved developer and user experience -- so many irrelevant but potentially confusing differences can be avoided completely,
 
-## How do I use Zebu?
+## How does Zebu work?
 
-Zebu is a tool for building little languages with tagged template strings, and it is itself a little language used with tagged template strings. Here's an example grammar:
+Let's walk through a simple example first, to cover the core principles, and then we can get to more useful examples. Here's how you create a language:
 
-```javascript
+```js
 import { lang } from 'zebu';
 
-const jsonish = lang`
-  Expr = #{ Pair ** "," : ${fromPairs} }
-       | #[ Expr ** "," ]
-       | "true"   : ${() => true}
-       | "false"  : ${() => false}
-       | "null"   : ${() => null}
+const add = lang`
+  Expr = Expr "+" value : ${(left, _, right) => left + right}
        | value;
-  Pair = value ":" Expr : ${(k, _, v) => ({ [k]: v })}; 
 `;
-
-assert.deepEqual(jsonish`{"foo": [123, "bar", true, false, null] }`, {
-  foo: [123, 'bar', true, false, null],
-});
 ```
 
-Zebu grammars are composed from a list of rules, separated by semicolons.
+And then you use the lanugage like this:
+
+```js
+const result = add`1 + ${2} + 3`;
+console.log(result); // 6
+```
+
+So what is actually happening here? `lang` is a function being used as a tagged template literal.
+
+```js
+lang`
+  Expr = Expr "+" value : ${(left, _, right) => left + right}
+       | value;
+`;
+// is equivalent to
+lang(
+  ['\n  Expr = Expr "+" value : ', '\n       | value;\n'],
+  (left, _, right) => left + right
+);
+`
+```
+
+Likewise:
+
+```js
+add`1 + ${2} + 3`;
+// is equivalent to
+add(['1 + ', ' + 3'], 2);
+```
+
+### Tokenizing
+
+Now, what is happening inside `add`? (We'll cover what's happening in `lang` in the next section.) First, the strings and interpolations passed into `add` are turned into an array of tokens. This process interleaves the strings and interpolations back together, and strips out any whitespace or comments:
+
+```js
+[
+  { type: 'value', value: 1 },
+  { type: 'literal', value: '+' },
+  { type: 'value', value: 2 },
+  { type: 'literal', value: '+' },
+  { type: 'value', value: 3 },
+];
+```
+
+- `value` - Numbers (decimal, hexidecimal, octal or binary), quoted strings (single or double quote), and interpolated values (of any type) are wrapped in `value` tokens. Note that there is no distinction between numbers and strings in the text of the input and those that are interpolated in; `` add`1` `` and `` add`${1}` ``, or `` add`"foo"` `` and `` add`${"foo"}` ``, are equivalent. You can even interpolate _into_ a quoted string -- `` add`"foo${"bar"}baz"` `` and `` add`"foobarbaz"` `` are equivalent.
+- `literal` - Values that are explicitly enumerated in the definition of a language will be wrapped in `literal` tokens. For example, the definition of `add` includes a `"+"`, so `+` is matched as a `literal` token. These are typically be used for keywords, operators, or other 'punctuation' in programming languages.
+- `identifier` - Values that match the identifier rules for JavaScript, and which are _not_ explicitly enumerated in the language's definition, are matched as `identifier` tokens.
+
+Any text that is not ignored as whitespace or comments and does not match any of the above token types will throw an error. For example, in `` add`1 - 2` ``, `"-"` is not in `add`'s definition and therefore is not identified as a literal, so this will throw.
+
+### Parsing
+
+Now that we've converted the input into tokens, let's match the tokens to the grammar in our language definition. Let's look at that again:
+
+```js
+lang`
+  Expr = Expr "+" value : ${(left, _, right) => left + right}
+       | value;
+`;
+```
+
+In this grammar, we have a single _rule_, labelled `Expr`; more complex grammars can have many rules, separated by semicolons. The `Expr` rule has two branches, separated by the `|` operator. The first branch matches a sequence -- first, it recursively matches itself, then it matches the token `{ type: 'literal', value: '+' }`, and then it matches any token of the type `value`. The results of each of these are passed into the function to the right, the result of which becomes the overall result of the expression. The second branch matches a single `value` token, and the result is the value in that token.
+
+When we apply this grammar to `` add`1 + ${2} + 3` ``, it parses as:
+
+<!-- NOTE: this sorta implies that we're doing bottom-up parsing; does that matter? -->
+
+```
+1     +   2     +    3
+value                       : 1
+Expr  "+" value             : 1 + 2
+Expr            "+"  value  : (1 + 2) + 3
+```
+
+And returns the result `6`.
+
+Unlike in regular expressions, parsing must match the whole input; `` add`1 +` `` or `` add` + 2` `` would both fail, as would `` add`1 + + 2 3` ``.
+
+## A more complicated example
+
+TODO: something with a couple of rules, more language features, notes on technique (e.g. precedence climbing)
+
+## Operator grammars
+
+TODO
+
+## Zebu language reference
+
+TODO
