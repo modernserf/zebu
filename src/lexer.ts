@@ -104,7 +104,7 @@ export class Lexer {
         /0x[0-9A-Fa-f_]+/, // number
         /0o[0-7_]+/,
         /0b[0-1_]+/,
-        /-?[0-9_]+(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/,
+        /-?[0-9][0-9_]*(?:\.[0-9_]*)?(?:[eE]-?[0-9_])?/,
         identifierPattern, // identifier
         operatorsPattern, // operators
       ]

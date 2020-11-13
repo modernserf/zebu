@@ -35,6 +35,10 @@
     "tabWidth": 2,
     "useTabs": false
   },
+  "jest": {
+    "collectCoverage": true,
+    "coveragePathIgnorePatterns": ["/node_modules/", "/src/examples/"]
+  },
   "module": "dist/zebu.esm.js",
   "size-limit": [
     {

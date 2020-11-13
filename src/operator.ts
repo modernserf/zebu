@@ -56,6 +56,7 @@ export function buildAST(rules: Rule[], rootExpr: string): AST {
       case 'post':
         push((l, op) => op(l), self, opAlts);
         break;
+      // istanbul ignore next
       default:
         assertUnreachable(rule.fixity);
     }

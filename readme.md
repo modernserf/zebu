@@ -82,7 +82,7 @@ Now, what is happening inside `add`? (We'll cover what's happening in `lang` in 
 ];
 ```
 
-- `value` - Numbers (decimal, hexidecimal, octal or binary), quoted strings (single or double quote), and interpolated values (of any type) are wrapped in `value` tokens. Note that there is no distinction between numbers and strings in the text of the input and those that are interpolated in; `` add`1` `` and `` add`${1}` ``, or `` add`"foo"` `` and `` add`${"foo"}` ``, are equivalent. You can even interpolate _into_ a quoted string -- `` add`"foo${"bar"}baz"` `` and `` add`"foobarbaz"` `` are equivalent.
+- `value` - Numbers (decimal, hexidecimal, octal or binary), quoted strings (single or double quote), and interpolated values (of any type) are wrapped in `value` tokens.
 - `literal` - Values that are explicitly enumerated in the definition of a language will be wrapped in `literal` tokens. For example, the definition of `add` includes a `"+"`, so `+` is matched as a `literal` token. These are typically be used for keywords, operators, or other 'punctuation' in programming languages.
 - `identifier` - Values that match the identifier rules for JavaScript, and which are _not_ explicitly enumerated in the language's definition, are matched as `identifier` tokens.
 
@@ -120,10 +120,239 @@ Unlike in regular expressions, parsing must match the whole input; `` add`1 +` `
 
 TODO: something with a couple of rules, more language features, notes on technique (e.g. precedence climbing)
 
-## Operator grammars
+### Operator grammars
 
 TODO
+
+### Tag helper
 
 ## Zebu language reference
 
-TODO
+### Literals
+
+A quoted string in a Zebu grammar matches the value of that string and returns that value.
+
+```js
+const lit = lang`Main = "foo"`;
+
+equal(lit`foo`, 'foo');
+
+throws(() => lit`bar`);
+throws(() => lit`"foo"`);
+```
+
+### Rules
+
+Zebu grammars are composed from a list of rules, separated by semicolons. Rules do not have to be defined in any particular order (a rule can reference rules either above or below it), but the top rule is the rule for the whole grammar.
+
+Identifiers in a grammar will match the rule with that name. Zebu will raise an error if there is no rule by that name.
+
+```js
+const math = lang`
+  Neg   = "-" Expr : ${(_, value) => -value}
+        | Expr;
+  Expr  = #( Neg )
+        | value;
+`;
+
+equal(math`123`, 123);
+equal(math`-123`, -123);
+equal(math`(123)`, 123);
+equal(math`-(-(123))`, 123);
+```
+
+### `value`
+
+The `value` keyword matches a number, a quoted string, or an interpolation, and returns that value.
+
+```js
+const val = lang`Main = value`;
+
+equal(val`"hello, world!"`, 'hello, world!');
+equal(val`'string with \'escaped quotes\''`, "string with 'escaped quotes'");
+equal(val`-123.45e6`, -123.45e6);
+equal(val`0xDEADBEEF`, 0xdeadbeef);
+
+equal(val`${1}`, 1);
+equal(val`${'hello, world!'}`, 'hello, world!');
+const object = {};
+equal(val`${object}`, object);
+
+equal(val`"foo${'bar'}baz"`, 'foobarbaz');
+```
+
+### `identifier`
+
+The `identifier` keyword matches a JavaScript identifier which is not used as a literal in the grammar, and returns that value.
+
+```js
+const id = lang`
+  Main = identifier;
+  Reserved = "class" | "function" | "if" | "else";
+`;
+
+equal(id`foo`, 'foo');
+equal(id`$bar`, 'bar');
+equal(id`_0`, '_0');
+
+throws(() => id`class`);
+```
+
+<!-- TODO: i'm still not entirely sure if keyword/operator are useful enough to be included -->
+
+### `keyword`
+
+The `keyword` keyword (!) matches a literal value that is in the format of a JavaScript identifier and returns that value.
+
+```js
+const kw = lang`
+  Main = identifier "." (identifier | keyword) 
+          : ${(left, _, right) => [left, right]};
+  Reserved = "class" | "function" | "if" | "else";
+`;
+
+equal(id`foo.bar`, ['foo', 'bar']);
+equal(id`foo.class`, ['foo', 'class']);
+
+throws(() => id`class.foo`);
+```
+
+### `operator`
+
+The `operator` keyword matches a literal value that is _not_ in the format of a JavaScript identifier. I have no idea why you would use this, but it is included for symmetry with `keyword`.
+
+### `nil`
+
+The `nil` keyword matches nothing and returns `null`.
+
+```js
+const opt = lang`Main = identifier | nil`;
+
+equal(opt`foo`, 'foo');
+equal(opt``, null);
+```
+
+### `include`
+
+The `include` keyword allows you to embed one grammar in another. If you use this, it will probably be for embedding an operator grammar.
+
+```js
+const prog = lang`
+  Program = Statement ** ";";
+  Statement = "print" Expr : ${(_, expr) => console.log(expr)}
+            | Expr;
+  Expr = include ${op`
+    left  "+"   : ${(l, r) => l + r}
+          "-"   : ${(l, r) => l - r}
+    left  "*"   : ${(l, r) => l * r}
+          "/"   : ${(l, r) => l / r}
+          "%"   : ${(l, r) => l % r}
+    right "**"  : ${(l, r) => l ** r}
+    pre   "-"   : ${x => -x}
+    root BaseExpr
+  `};
+  BaseExpr = value;
+`;
+```
+
+### Sequence
+
+A sequence of expressions, e.g. `Foo Bar` matches Foo followed by Bar and returns the result of the first expression. A sequence of expressions followed by a colon and an interpolated function matches that sequence and passes the results of each expression into that function, returning the result.
+
+```js
+const seq = lang`value identifier`;
+equal(seq`1 foo`, 1);
+equal(seq`"bar" foo`, 'bar');
+throws(() => seq`foo 1`);
+throws(() => seq`1`);
+throws(() => seq`1 foo 2`);
+
+const add = lang`value value : ${(left, right) => left + right}`;
+equal(add`1 2`, 3);
+equal(add`"foo" "bar"`, 'foobar');
+throws(() => add`1`);
+throws(() => add`1 2 3`);
+```
+
+### Alternation
+
+The pipe character, `|`, like in regular expressions, is the alternation operator, and (Foo | Bar) matches either of the rules Foo or Bar.
+
+```js
+const alts = lang`
+  Main = "foo" | "bar" | value;
+`;
+
+equal(alts`foo`, 'foo');
+equal(alts`bar`, 'bar');
+equal(alts`123.45`, 123.45);
+```
+
+#### A note about parsing strategy
+
+The behavior of this operator happens to be one of the major differences between traditional CFG parsers (including Zebu) and PEG parsers. In Zebu, the order of branches doesn't matter -- the parser looks ahead at the next tokens and chooses the branch based on that. However, this means that each branch must not overlap; if they do, Zebu will raise a "first/first conflict" error.
+On the other hand, PEG parsers try each branch in order, and backtrack if one doesn't succeed. This means that branches _can_ overlap, though more often than not overlapping branches are an indication of a bug, not a desirable feature.
+
+### Repetition
+
+The operators `*`, `+` and `?` work similarly to how they work in regular expressions:
+
+- `Expr*` matches a sequence of 0 or more `Expr`s and returns an array,
+- `Expr+` matches a sequence of 1 or more `Expr`s and returns an array,
+- `Expr?` optionally matches `Expr`, and returns null if it doesn't match. `Expr?` is equivalent to `(Expr | nil)`.
+
+```js
+const repeat0 = lang`value*`;
+equal(repeat0``, []);
+equal(repeat0`"foo"`, ['foo']);
+equal(repeat0`"foo" "bar"`, ['foo', 'bar']);
+
+const repeat1 = lang`value+`;
+throws(() => repeat1``);
+equal(repeat1`"foo"`, ['foo']);
+equal(repeat1`"foo" "bar"`, ['foo', 'bar']);
+
+const maybe = lang`value?`;
+equal(maybe``, null);
+equal(maybe`"foo"`, 'foo');
+```
+
+### Parentheses, brackets and braces
+
+Zebu includes syntactic sugar for matching expressions wrapped in punctuation:
+
+- `#{ Expr }` matches `Expr` wrapped in curly braces and returns the result of `Expr`, and is equivalent to `("{" Expr "}" : ${(_, result) => result})`
+- `#[ Expr ]` as above, for square brackets
+- `#( Expr )` as above, for parentheses.
+
+### Separated sequences
+
+The operators `++` and `**` are used for matching sequences with separators, e.g. function arguments separated by commas, or statements separated by semicolons, and return an array of the matched expression (ignoring the separators). The `++` operator matches one or more elements, while the `**` operator matches zero or more. Both allow optional trailing separators.
+
+```js
+const sepBy0 = lang`value ** ","`;
+equal(sepBy0``, []);
+equal(sepBy0`1`, [1]);
+equal(sepBy0`1,`, [1]);
+equal(sepBy0`1, 2`, [1, 2]);
+
+const sepBy1 = lang`value ++ ","`;
+throws(() => sepBy1``);
+equal(sepBy1`1`, [1]);
+equal(sepBy1`1,`, [1]);
+equal(sepBy1`1, 2`, [1, 2]);
+```
+
+If you explicitly do _not_ want trailing separators to be valid, use something like:
+
+```js
+const noTrailing1 = lang`
+  Main = value Rest* : ${(first, rest) => [first, ...rest]};
+  Rest = "," value : ${(_, value) => value};
+`;
+
+throws(() => noTrailing1``);
+equal(noTrailing1`1`, [1]);
+throws(() => noTrailing1`1,`);
+equal(noTrailing1`1, 2`, [1, 2]);
+```
