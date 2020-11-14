@@ -77,7 +77,9 @@ test('repeaters', () => {
 
 test('if else', () => {
   const ifElse = lang`
-    IfElse = "if" Block ("else" (IfElse | Block))?;
+    IfElse = "if" Block Else? 
+      : ${(_, ifBlock, elseBlock) => ({ ifBlock, elseBlock })};
+    Else = "else" (IfElse | Block) : ${(_, x) => x};
     Block = value;
   `;
   ifElse`if "foo"`;
@@ -94,10 +96,13 @@ test('interpolated parser', () => {
 });
 
 test('keyword and operator terminals', () => {
+  const noop = () => {
+    return;
+  };
   const it = lang`
-    Statement = "print" Expr;
-    Expr      = DotExpr ("+" Expr)*;
-    DotExpr   = RootExpr ("." (identifier | keyword))*;
+    Statement = "print" Expr : ${noop};
+    Expr      = DotExpr ("+" Expr : ${noop})* : ${noop};
+    DotExpr   = RootExpr ("." (identifier | keyword) : ${noop})* : ${noop};
     RootExpr  = #( operator )
               | identifier
               | value;
@@ -142,20 +147,27 @@ test('structures', () => {
 });
 
 test('unresolvable conflicts', () => {
-  expect(() => lang`Main = value? value`.compile()).toThrow(CompileError);
-  expect(() => lang`Main = "foo" value? value`.compile()).toThrow(CompileError);
+  const noop = () => {
+    return;
+  };
+  expect(() => lang`Main = value? value : ${noop}`.compile()).toThrow(
+    CompileError
+  );
+  expect(() => lang`Main = "foo" value? value : ${noop}`.compile()).toThrow(
+    CompileError
+  );
   // TODO: why does this throw, but not the rule below?
   expect(() => {
     lang`
-      Main = Loop value;
+      Main = Loop value : ${noop};
       Loop = value Loop : ${(l, r) => [l, ...r]}
            | nil : ${() => []};
     `.compile();
   }).toThrow(CompileError);
   // expect(() => lang`Main = value* value`.compile()).toThrow(CompileError);
   expect(() =>
-    lang`Main = value ${() => 'x'}
-              | value ${() => 'y'};
+    lang`Main = value : ${() => 'x'}
+              | value : ${() => 'y'};
         `.compile()
   ).toThrow(CompileError);
 });

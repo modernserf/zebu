@@ -5,7 +5,7 @@ test('pretty-printer', () => {
 Grammar = Rule ++ ";"
 Rule = identifier "=" AltExpr
 AltExpr = "|"? SeqExpr ("|" SeqExpr)*
-SeqExpr = SepExpr+ (":" value)?
+SeqExpr = SepExpr (SepExpr* ":" value)?
 SepExpr = SepExpr "**" RepExpr
         | SepExpr "++" RepExpr
         | RepExpr
@@ -26,10 +26,10 @@ Expr = #( AltExpr )
      | "nil"
      | value`);
 
-  const { error, repeat0, sepBy0, lit, seq, alt } = builders;
+  const { error, repeat1, sepBy0, lit, seq, alt } = builders;
 
-  const grammarWithOtherTokens = repeat0(sepBy0(error('message'), lit('foo')));
-  expect(print(grammarWithOtherTokens)).toEqual(`(<error: message> ** "foo")*`);
+  const grammarWithOtherTokens = repeat1(sepBy0(error('message'), lit('foo')));
+  expect(print(grammarWithOtherTokens)).toEqual(`(<error: message> ** "foo")+`);
 
   const grammarWithInnerAlt = seq(
     () => null,

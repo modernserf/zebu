@@ -137,9 +137,9 @@ export class Seq implements Parser {
 }
 
 export class Reduce implements Parser {
-  constructor(private arity: number, private fn: SeqFn | null) {}
+  constructor(private arity: number, private fn: SeqFn) {}
   parse(state: ParseState): void {
-    state.reduce(this.arity, this.fn || (x => x));
+    state.reduce(this.arity, this.fn);
   }
 }
 

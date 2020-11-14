@@ -257,21 +257,18 @@ const prog = lang`
 
 ### Sequence
 
-A sequence of expressions, e.g. `Foo Bar` matches Foo followed by Bar and returns the result of the first expression. A sequence of expressions followed by a colon and an interpolated function matches that sequence and passes the results of each expression into that function, returning the result.
+A sequence of expressions followed by a colon and an interpolated function matches that sequence and passes the results of each expression into that function, returning the result.
 
 ```js
-const seq = lang`value identifier`;
-equal(seq`1 foo`, 1);
-equal(seq`"bar" foo`, 'bar');
-throws(() => seq`foo 1`);
-throws(() => seq`1`);
-throws(() => seq`1 foo 2`);
+const seq = lang`identifier "=" value : ${(name, _, value) => ({
+  [name]: value,
+})}`;
+equal(seq`foo = 1`, { foo: 1 });
+equal(seq`bar = "bar"`, { bar: 'bar' });
 
-const add = lang`value value : ${(left, right) => left + right}`;
-equal(add`1 2`, 3);
-equal(add`"foo" "bar"`, 'foobar');
-throws(() => add`1`);
-throws(() => add`1 2 3`);
+throws(() => seq`foo`);
+throws(() => seq`foo = 1 bar`);
+throws(() => seq`1 = foo`);
 ```
 
 ### Alternation

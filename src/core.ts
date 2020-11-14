@@ -13,7 +13,7 @@ export type AST =
   | { type: 'repeat1'; expr: AST }
   | { type: 'sepBy0'; expr: AST; separator: AST }
   | { type: 'sepBy1'; expr: AST; separator: AST }
-  | { type: 'seq'; exprs: AST[]; fn: SeqFn | null }
+  | { type: 'seq'; exprs: AST[]; fn: SeqFn }
   | { type: 'alt'; exprs: AST[] }
   | { type: 'ruleset'; rules: Array<{ name: string; expr: AST }> };
 
@@ -92,7 +92,7 @@ const ident = (value: string): AST => ({ type: 'identifier', value });
 const lit = (value: string): AST => ({ type: 'literal', value });
 const terminal = (value: TerminalType): AST => ({ type: 'terminal', value });
 const alt = (...exprs: AST[]): AST => ({ type: 'alt', exprs });
-const seq = (fn: SeqFn | null, ...exprs: AST[]): AST => ({
+const seq = (fn: SeqFn, ...exprs: AST[]): AST => ({
   type: 'seq',
   fn,
   exprs,
@@ -146,9 +146,12 @@ export const coreAST = ruleset(
     repeat0(seq((_,x) => x, lit('|'), ident('SeqExpr'))))
   ),
   rule('SeqExpr', seq(
-    (exprs, fn) => (fn || exprs.length > 1) ? seq(fn, ...exprs) : exprs[0],
-    repeat1(ident('SepExpr')),
-    maybe(seq((_, expr) => expr, lit(":"), terminal('value')))
+    (first, getSeq) => getSeq ? getSeq(first) : first,
+    ident('SepExpr'), 
+    maybe(seq(
+      (rest, _, fn) => (first) => seq(fn, first, ...rest),
+      repeat0(ident('SepExpr')), lit(":"), terminal('value')
+    )),
   )),
   rule('SepExpr', alt(
     seq((expr, _, sep) => sepBy0(expr, sep), 

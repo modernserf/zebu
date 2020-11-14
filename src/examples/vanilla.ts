@@ -515,8 +515,8 @@ function parseAssignment(left: Expr, right: Expr): Expr {
 export const vanilla = lang`
   Program = Statement ** ";" : ${interpret};
   Block = #{ Statement ** ";" };
-  Statement
-    = "let" Binding "=" Expression          : ${tag`let _ binding _ expr`}
+  Statement =
+    | "let" Binding "=" Expression          : ${tag`let _ binding _ expr`}
     | "while" Expression Block              : ${tag`while _ expr body`}
     | "for" Binding "of" Expression Block   : ${tag`for _ binding _ expr body`}
     | "return" Expression?                  : ${tag`return _ expr`}
@@ -556,8 +556,8 @@ export const vanilla = lang`
     root RootExpression
   `};
   
-  RootExpression 
-    = #( Expression )
+  RootExpression =
+    | #( Expression )
     | RootExpression #( Expression ** "," ) : ${tag`call expr args`}
     | RootExpression #[ Expression ]        : ${tag`get expr arg`}
     | RootExpression "." Key                : ${tag`get expr _ arg`}
