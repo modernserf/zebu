@@ -127,12 +127,13 @@ test('separators', () => {
 test('structures', () => {
   const fromPairs = pairs => pairs.reduce((l, r) => Object.assign(l, r), {});
   const json = lang`
-    Expr = #{ Pair ** "," : ${fromPairs} }
-         | #[ Expr ** "," ]
-         | "true"   : ${() => true}
-         | "false"  : ${() => false}
-         | "null"   : ${() => null}
-         | value;
+    Expr = 
+      | #{ Pair ** "," : ${fromPairs} }
+      | #[ Expr ** "," ]
+      | "true"   : ${() => true}
+      | "false"  : ${() => false}
+      | "null"   : ${() => null}
+      | value;
     Pair = value ":" Expr : ${(k, _, v) => ({ [k]: v })}; 
   `;
   expect(json`{"foo": [123, "bar", true, false, null] }`).toEqual({

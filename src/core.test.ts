@@ -4,7 +4,7 @@ test('pretty-printer', () => {
   expect(print(coreAST)).toEqual(`
 Grammar = Rule ++ ";"
 Rule = identifier "=" AltExpr
-AltExpr = SeqExpr ++ "|"
+AltExpr = "|"? SeqExpr ("|" SeqExpr)*
 SeqExpr = SepExpr+ (":" value)?
 SepExpr = SepExpr "**" RepExpr
         | SepExpr "++" RepExpr

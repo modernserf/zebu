@@ -141,8 +141,9 @@ export const coreAST = ruleset(
     terminal('identifier'), lit('='), ident('AltExpr')
   )),
   rule('AltExpr', seq(
-    (exprs) => exprs.length > 1 ? alt(...exprs): exprs[0],
-    sepBy1(ident('SeqExpr'), lit('|')))
+    (_, first, rest) => rest.length ? alt(first, ...rest) : first,
+    maybe(lit('|')), ident('SeqExpr'), 
+    repeat0(seq((_,x) => x, lit('|'), ident('SeqExpr'))))
   ),
   rule('SeqExpr', seq(
     (exprs, fn) => (fn || exprs.length > 1) ? seq(fn, ...exprs) : exprs[0],
