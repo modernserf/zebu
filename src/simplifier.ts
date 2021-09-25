@@ -11,7 +11,7 @@ export type SimpleASTNode =
   | { type: 'identifier' }
   | { type: 'value' }
   | { type: 'nonterminal'; value: symbol }
-  | { type: 'reduce'; arity: number; fn: SeqFn | null };
+  | { type: 'reduce'; arity: number; fn: SeqFn };
 
 export type SimpleAST = SimpleASTNode | SimpleASTSeq | SimpleASTAlt;
 
